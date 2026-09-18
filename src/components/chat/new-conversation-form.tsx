@@ -7,9 +7,10 @@ import { Loader2Icon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { createConversation } from "@/app/actions/conversations";
+import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/native-select";
+import { useProviderModels } from "@/hooks/use-provider-models";
 import { PROVIDERS } from "@/lib/providers";
 import type { Profile, ProviderId } from "@/lib/types";
 
@@ -43,6 +44,8 @@ export function NewConversationForm({
       : PROVIDERS[initialProvider].defaultModel,
   );
   const [profileId, setProfileId] = useState<string>(profiles[0]?.id ?? "");
+
+  const models = useProviderModels(provider);
 
   function handleProviderChange(next: ProviderId) {
     setProvider(next);
@@ -120,8 +123,8 @@ export function NewConversationForm({
             placeholder={PROVIDERS[provider].defaultModel}
           />
           <datalist id="new-model-options">
-            {PROVIDERS[provider].suggestedModels.map((suggestion) => (
-              <option key={suggestion} value={suggestion} />
+            {models.map((model) => (
+              <option key={model} value={model} />
             ))}
           </datalist>
         </div>

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useProviderModels } from "@/hooks/use-provider-models";
 import { PROVIDERS, PROVIDER_IDS } from "@/lib/providers";
 import type { ProviderId } from "@/lib/types";
 
@@ -30,6 +31,8 @@ export function SettingsForm({ initial }: SettingsFormProps) {
   );
   const [provider, setProvider] = useState<ProviderId>(initial.default_provider);
   const [model, setModel] = useState(initial.default_model);
+
+  const models = useProviderModels(provider);
 
   function handleSave() {
     startTransition(async () => {
@@ -101,8 +104,8 @@ export function SettingsForm({ initial }: SettingsFormProps) {
               placeholder={PROVIDERS[provider].defaultModel}
             />
             <datalist id="default-model-options">
-              {PROVIDERS[provider].suggestedModels.map((suggestion) => (
-                <option key={suggestion} value={suggestion} />
+              {models.map((model) => (
+                <option key={model} value={model} />
               ))}
             </datalist>
           </div>
