@@ -1,4 +1,4 @@
-import { generateText, Output } from "ai";
+import { generateText, type LanguageModel } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -18,11 +18,15 @@ const bodySchema = z.object({
   scenes: z.number().int().min(1).max(50).optional(),
 });
 
+const JSON_FORMAT = `{"prompts":[{"scene":"...","prompt":"..."}]}`;
+
 const BASE_INSTRUCTIONS = `Eres un director de arte especializado en imágenes para redes sociales.
 Recibes un guion y devuelves los prompts de imagen necesarios para ilustrarlo, en el mismo idioma
 del guion. Cada prompt debe ser una descripción visual autosuficiente, lista para pegar en un
 generador de imágenes, e incluir sujeto, acción, entorno, iluminación, encuadre y estilo.
-No incluyas texto, marcas de agua ni logotipos en la descripción.`;
+No incluyas texto, marcas de agua ni logotipos en la descripción.
+Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni bloques de código, con esta
+forma exacta: ${JSON_FORMAT}`;
 
 const outputSchema = z.object({
   prompts: z
@@ -34,6 +38,51 @@ const outputSchema = z.object({
     )
     .describe("Un prompt por cada plano o escena relevante del guion."),
 });
+
+/**
+ * Extrae el JSON de la respuesta del modelo aunque venga envuelto en texto o
+ * en un bloque de código markdown.
+ */
+function extractPrompts(rawText: string) {
+  const fenced = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : rawText;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+
+  if (start === -1 || end <= start) return null;
+
+  try {
+    const parsed = outputSchema.safeParse(JSON.parse(candidate.slice(start, end + 1)));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * No todos los proveedores/gateways respetan el "structured output" nativo
+ * (por ejemplo Claude a través de AIRAI devolvía prosa). Por eso pedimos JSON
+ * en el propio prompt y lo parseamos, con un reintento más estricto.
+ */
+async function generateImagePrompts(
+  languageModel: LanguageModel,
+  instructions: string,
+  prompt: string,
+) {
+  const first = await generateText({ model: languageModel, instructions, prompt });
+  const parsedFirst = extractPrompts(first.text);
+  if (parsedFirst) return parsedFirst;
+
+  const second = await generateText({
+    model: languageModel,
+    instructions: `${instructions}\n\nIMPORTANTE: tu respuesta anterior no era JSON válido. Devuelve SOLO el JSON, empezando por { y terminando por }, sin explicaciones ni bloques de código.`,
+    prompt,
+  });
+  const parsedSecond = extractPrompts(second.text);
+  if (parsedSecond) return parsedSecond;
+
+  throw new Error("El modelo no devolvió un JSON válido con los prompts. Inténtalo de nuevo.");
+}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -82,18 +131,9 @@ export async function POST(request: Request) {
 
     const prompt = [countLine, "Guion:", script].join("\n\n");
 
-    const { output } = await generateText({
-      model: languageModel,
-      instructions,
-      prompt,
-      output: Output.object({
-        schema: outputSchema,
-        name: "imagePrompts",
-        description: "Lista de prompts de imagen derivados del guion.",
-      }),
-    });
+    const generated = await generateImagePrompts(languageModel, instructions, prompt);
 
-    const imagePrompts: ImagePrompt[] = (output?.prompts ?? []).map((item, index) => ({
+    const imagePrompts: ImagePrompt[] = generated.prompts.map((item, index) => ({
       index: index + 1,
       scene: item.scene,
       prompt: item.prompt,

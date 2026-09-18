@@ -188,12 +188,21 @@ export function ChatWorkspace({
         }),
       });
 
-      const data = (await response.json()) as { imagePrompts?: ImagePrompt[]; error?: string };
+      const raw = await response.text();
 
-      if (!response.ok || !data.imagePrompts) {
-        throw new Error(data.error ?? "No se pudieron generar los prompts.");
+      let data: { imagePrompts?: ImagePrompt[]; error?: string } = {};
+      try {
+        data = JSON.parse(raw) as typeof data;
+      } catch {
+        // La respuesta no era JSON (por ejemplo un error de plataforma).
       }
 
+      if (!response.ok || !data.imagePrompts) {
+        throw new Error(
+          data.error ??
+            (raw.trim().slice(0, 200) || `El servidor devolvió un error (${response.status}).`),
+        );
+      }
       setImagePrompts(data.imagePrompts);
       setPromptsSource(lastAssistantText);
       toast.success(`${data.imagePrompts.length} prompts generados.`);
