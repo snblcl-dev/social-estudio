@@ -1,4 +1,10 @@
-export type ProviderId = "openai" | "anthropic" | "google" | "deepseek" | "openrouter";
+export type ProviderId =
+  | "openai"
+  | "anthropic"
+  | "google"
+  | "deepseek"
+  | "openrouter"
+  | "airai";
 
 export interface ProviderInfo {
   id: ProviderId;
@@ -8,6 +14,10 @@ export interface ProviderInfo {
   keyPlaceholder: string;
   defaultModel: string;
   suggestedModels: string[];
+  /** URL base para proveedores compatibles con la API de OpenAI. */
+  baseURL?: string;
+  /** Si es true, se usa la API de Chat Completions de OpenAI. */
+  openaiCompatible?: boolean;
 }
 
 export interface Profile {

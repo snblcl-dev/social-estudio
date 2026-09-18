@@ -21,6 +21,14 @@ export class MissingApiKeyError extends Error {
 
 /** Construye una instancia de modelo del AI SDK para el proveedor indicado. */
 export function buildModel(provider: ProviderId, model: string, apiKey: string): LanguageModel {
+  const info = PROVIDERS[provider];
+
+  // Proveedores compatibles con la API de OpenAI (gateways personalizados).
+  // Se usa Chat Completions porque es lo que exponen estos servicios.
+  if (info.openaiCompatible && info.baseURL) {
+    return createOpenAI({ apiKey, baseURL: info.baseURL, name: info.id }).chat(model);
+  }
+
   switch (provider) {
     case "openai":
       return createOpenAI({ apiKey })(model);
@@ -32,6 +40,9 @@ export function buildModel(provider: ProviderId, model: string, apiKey: string):
       return createDeepSeek({ apiKey })(model);
     case "openrouter":
       return createOpenRouter({ apiKey })(model);
+    case "airai":
+      // Se resuelve en la rama OpenAI-compatible de arriba.
+      throw new Error("El proveedor AIRAI requiere baseURL en la configuración.");
     default: {
       const exhaustive: never = provider;
       throw new Error(`Proveedor no soportado: ${exhaustive}`);

@@ -52,6 +52,16 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
       "meta-llama/llama-3.3-70b-instruct",
     ],
   },
+  airai: {
+    id: "airai",
+    label: "AIRAI",
+    hint: "Introduce tu clave de api.airai.cc",
+    keyPlaceholder: "sk-...",
+    baseURL: "https://api.airai.cc/v1",
+    openaiCompatible: true,
+    defaultModel: "deepseek-v4-flash",
+    suggestedModels: ["deepseek-v4-flash", "deepseek-v4.1-flash", "claude-sonnet-4-6"],
+  },
 };
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];

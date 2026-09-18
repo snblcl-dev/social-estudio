@@ -2,6 +2,7 @@ import "server-only";
 
 import { decryptSecret } from "@/lib/crypto";
 import { getApiKeyRow } from "@/lib/data/settings";
+import { PROVIDERS } from "@/lib/providers";
 import type { ProviderId } from "@/lib/types";
 
 const EXCLUDED_PATTERNS = [
@@ -101,7 +102,25 @@ async function listGoogleModels(apiKey: string) {
   return extractIds(json, "models");
 }
 
+async function requireApiKey(userId: string, provider: ProviderId) {
+  const row = await getApiKeyRow(userId, provider);
+
+  if (!row) {
+    throw new Error(`No hay una API key guardada para este proveedor.`);
+  }
+
+  return decryptSecret(row.encrypted_key);
+}
+
 export async function listModelsForProvider(userId: string, provider: ProviderId) {
+  const info = PROVIDERS[provider];
+
+  // Proveedores compatibles con la API de OpenAI (gateways personalizados).
+  if (info.openaiCompatible && info.baseURL) {
+    const apiKey = await requireApiKey(userId, provider);
+    return extractIds(await fetchWithKey(`${info.baseURL}/models`, apiKey), "data");
+  }
+
   switch (provider) {
     case "anthropic":
       // Anthropic no expone un endpoint público para listar modelos.
@@ -111,19 +130,17 @@ export async function listModelsForProvider(userId: string, provider: ProviderId
     case "deepseek":
     case "openrouter":
     case "google": {
-      const row = await getApiKeyRow(userId, provider);
-
-      if (!row) {
-        throw new Error(`No hay una API key guardada para este proveedor.`);
-      }
-
-      const apiKey = decryptSecret(row.encrypted_key);
+      const apiKey = await requireApiKey(userId, provider);
 
       if (provider === "openai") return listOpenAIModels(apiKey);
       if (provider === "deepseek") return listDeepSeekModels(apiKey);
       if (provider === "openrouter") return listOpenRouterModels(apiKey);
       return listGoogleModels(apiKey);
     }
+
+    case "airai":
+      // Se resuelve en la rama OpenAI-compatible de arriba.
+      throw new Error("El proveedor AIRAI requiere baseURL en la configuración.");
 
     default: {
       const exhaustive: never = provider;
