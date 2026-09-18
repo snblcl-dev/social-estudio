@@ -35,8 +35,8 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     label: "DeepSeek",
     hint: "Consigue tu clave en platform.deepseek.com/api_keys",
     keyPlaceholder: "sk-...",
-    defaultModel: "deepseek-chat",
-    suggestedModels: ["deepseek-chat", "deepseek-reasoner"],
+    defaultModel: "deepseek-flash",
+    suggestedModels: ["deepseek-flash", "deepseek-v4-pro"],
   },
   openrouter: {
     id: "openrouter",
