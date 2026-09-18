@@ -24,6 +24,7 @@ const BASE_INSTRUCTIONS = `Eres un director de arte especializado en imágenes p
 Recibes un guion y devuelves los prompts de imagen necesarios para ilustrarlo, en el mismo idioma
 del guion. Cada prompt debe ser una descripción visual autosuficiente, lista para pegar en un
 generador de imágenes, e incluir sujeto, acción, entorno, iluminación, encuadre y estilo.
+Sé conciso: una o dos frases por prompt, sin repetir información entre prompts.
 No incluyas texto, marcas de agua ni logotipos en la descripción.
 Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni bloques de código, con esta
 forma exacta: ${JSON_FORMAT}`;
@@ -62,26 +63,36 @@ function extractPrompts(rawText: string) {
 /**
  * No todos los proveedores/gateways respetan el "structured output" nativo
  * (por ejemplo Claude a través de AIRAI devolvía prosa). Por eso pedimos JSON
- * en el propio prompt y lo parseamos, con un reintento más estricto.
+ * en el propio prompt y lo parseamos.
+ *
+ * Se limita el tiempo y los tokens para no superar el límite de duración de la
+ * función en Vercel (FUNCTION_INVOCATION_TIMEOUT).
  */
+const GENERATION_TIMEOUT_MS = 50_000;
+
 async function generateImagePrompts(
   languageModel: LanguageModel,
   instructions: string,
   prompt: string,
 ) {
-  const first = await generateText({ model: languageModel, instructions, prompt });
-  const parsedFirst = extractPrompts(first.text);
-  if (parsedFirst) return parsedFirst;
-
-  const second = await generateText({
+  const result = await generateText({
     model: languageModel,
-    instructions: `${instructions}\n\nIMPORTANTE: tu respuesta anterior no era JSON válido. Devuelve SOLO el JSON, empezando por { y terminando por }, sin explicaciones ni bloques de código.`,
+    instructions,
     prompt,
+    maxOutputTokens: 3000,
+    maxRetries: 1,
+    abortSignal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
   });
-  const parsedSecond = extractPrompts(second.text);
-  if (parsedSecond) return parsedSecond;
 
-  throw new Error("El modelo no devolvió un JSON válido con los prompts. Inténtalo de nuevo.");
+  const parsed = extractPrompts(result.text);
+
+  if (!parsed) {
+    throw new Error(
+      "El modelo no devolvió un JSON válido con los prompts. Prueba con otro modelo (por ejemplo deepseek-v4-flash).",
+    );
+  }
+
+  return parsed;
 }
 
 export async function POST(request: Request) {
@@ -150,6 +161,19 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof MissingApiKeyError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (
+      error instanceof Error &&
+      (error.name === "AbortError" || error.name === "TimeoutError")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "La generación tardó demasiado. Prueba con un modelo más rápido (por ejemplo deepseek-v4-flash) o reduce el número de escenas.",
+        },
+        { status: 504 },
+      );
     }
 
     console.error("[api/image-prompts]", error);
