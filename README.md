@@ -84,6 +84,8 @@ Migraciones disponibles:
 
 - `0002_profile_image_instructions.sql` → mueve las instrucciones de prompts de imagen de
   `settings` (global) a `profiles` (una por perfil) y conserva lo que ya tenías.
+- `0003_messages_position.sql` → añade una columna `position` a `messages` para garantizar el
+  orden de los mensajes al recargar una conversación.
 
 ## Despliegue en Vercel
 

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { saveConversationMessages } from "@/app/actions/conversations";
 import { saveScript } from "@/app/actions/scripts";
 import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
@@ -66,6 +67,9 @@ export function ChatWorkspace({
   const [isSavingScript, setIsSavingScript] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const savedSignatureRef = useRef(
+    `${initial.length}:${initial[initial.length - 1]?.id ?? ""}`,
+  );
 
   const transport = useMemo(() => new DefaultChatTransport({ api: "/api/chat" }), []);
 
@@ -76,6 +80,38 @@ export function ChatWorkspace({
   });
 
   const isBusy = status === "submitted" || status === "streaming";
+
+  // Guarda el historial en el servidor cuando la respuesta termina.
+  // Se hace desde el cliente (Server Action) para garantizar que la escritura
+  // en Supabase dispone del contexto de la petición y de la sesión.
+  useEffect(() => {
+    if (status !== "ready" || messages.length === 0) return;
+
+    const signature = `${messages.length}:${messages[messages.length - 1]?.id ?? ""}`;
+    if (savedSignatureRef.current === signature) return;
+    savedSignatureRef.current = signature;
+
+    const payload = messages
+      .filter((message) => message.role === "user" || message.role === "assistant")
+      .map((message) => ({
+        id: message.id,
+        role: message.role,
+        parts: message.parts,
+      }));
+
+    void saveConversationMessages({
+      conversationId: conversation.id,
+      provider,
+      model,
+      profileId: profileId || null,
+      messages: payload,
+    }).then((result) => {
+      if (result.error) {
+        console.error("[chat] no se pudo guardar el historial:", result.error);
+        toast.error(`No se pudo guardar el historial: ${result.error}`);
+      }
+    });
+  }, [status, messages, conversation.id, provider, model, profileId]);
 
   const lastAssistantText = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {

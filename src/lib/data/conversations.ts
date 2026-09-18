@@ -46,6 +46,7 @@ export async function listMessages(
     .select("*")
     .eq("user_id", userId)
     .eq("conversation_id", conversationId)
+    .order("position", { ascending: true })
     .order("created_at", { ascending: true });
 
   return (data as MessageRow[] | null) ?? [];

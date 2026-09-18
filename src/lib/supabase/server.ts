@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/env";
@@ -34,4 +35,16 @@ export async function getCurrentUser() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   return data.user;
+}
+
+/**
+ * Cliente de Supabase autenticado con un access token concreto.
+ * No depende de `cookies()`, por lo que es seguro usarlo en trabajo que se
+ * ejecuta después de enviar la respuesta (por ejemplo, dentro de `after`).
+ */
+export function createClientWithToken(accessToken: string) {
+  return createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }

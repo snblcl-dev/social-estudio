@@ -5,13 +5,14 @@ import {
   toUIMessageStream,
   type UIMessage,
 } from "ai";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, after } from "next/server";
 import { z } from "zod";
 
 import { MissingApiKeyError, resolveModelForUser } from "@/lib/ai/model";
 import { getProfile } from "@/lib/data/profiles";
 import { isProviderId } from "@/lib/providers";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { createClient, createClientWithToken } from "@/lib/supabase/server";
 import type { Profile, ProviderId } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -59,21 +60,21 @@ function buildInstructions(profile: Profile | null) {
 }
 
 async function persistConversation(
+  supabase: SupabaseClient,
   userId: string,
   conversationId: string,
   messages: UIMessage[],
   meta: { provider: string; model: string; profileId: string | null },
 ) {
-  const supabase = await createClient();
-
   const rows = messages
     .filter((message) => message.role === "user" || message.role === "assistant")
-    .map((message) => ({
+    .map((message, index) => ({
       id: message.id,
       conversation_id: conversationId,
       user_id: userId,
       role: message.role,
       parts: message.parts,
+      position: index,
     }));
 
   if (rows.length > 0) {
@@ -119,11 +120,21 @@ function extractText(message: UIMessage) {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
+
+  // Token de sesión para poder escribir en Supabase dentro de `after`
+  // sin depender de `cookies()`.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const accessToken = session?.access_token ?? null;
 
   let payload: unknown;
 
@@ -170,11 +181,16 @@ export async function POST(request: Request) {
       resolveFinalMessages = resolve;
     });
 
-    // `after` se ejecuta cuando la respuesta ha terminado, pero conserva el
-    // contexto de la petición: por eso `cookies()` funciona dentro y la
-    // escritura en Supabase no queda bloqueada por RLS.
+    // `after` se ejecuta cuando la respuesta ha terminado. Usamos un cliente
+    // autenticado con el token de sesión (no con cookies) para que la escritura
+    // en Supabase funcione aunque el contexto de la petición ya no esté activo.
     after(async () => {
       try {
+        if (!accessToken) {
+          console.warn("[api/chat] sin token de sesión, no se guardará la conversación");
+          return;
+        }
+
         const completed = await Promise.race([
           finalMessages,
           new Promise<UIMessage[]>((resolve) => setTimeout(() => resolve([]), 30000)),
@@ -185,11 +201,17 @@ export async function POST(request: Request) {
           return;
         }
 
-        await persistConversation(user.id, conversationId, completed, {
-          provider,
-          model,
-          profileId: profileId ?? null,
-        });
+        await persistConversation(
+          createClientWithToken(accessToken),
+          user.id,
+          conversationId,
+          completed,
+          {
+            provider,
+            model,
+            profileId: profileId ?? null,
+          },
+        );
       } catch (persistError) {
         console.error("[api/chat] error al guardar la conversación", persistError);
       }

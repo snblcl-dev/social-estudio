@@ -70,10 +70,11 @@ create table if not exists public.messages (
   user_id uuid not null references auth.users (id) on delete cascade,
   role text not null check (role in ('user', 'assistant', 'system')),
   parts jsonb not null default '[]'::jsonb,
+  position integer not null default 0,
   created_at timestamptz not null default now()
 );
 
-create index if not exists messages_conversation_idx on public.messages (conversation_id, created_at);
+create index if not exists messages_conversation_idx on public.messages (conversation_id, position, created_at);
 
 -- ---------------------------------------------------------------------------
 -- SCRIPTS: guiones guardados + prompts de imagen generados
