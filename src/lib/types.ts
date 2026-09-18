@@ -27,13 +27,13 @@ export interface Profile {
   description: string | null;
   script_instructions: string;
   theme_instructions: string;
+  image_prompt_instructions: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface UserSettings {
   user_id: string;
-  image_prompt_instructions: string;
   default_provider: ProviderId;
   default_model: string;
   updated_at: string;

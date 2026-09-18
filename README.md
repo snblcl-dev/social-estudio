@@ -66,13 +66,24 @@ para guardar tu primera API key.
 
 ## Uso
 
-1. **Ajustes** → pega tus API keys (OpenAI, Anthropic, Gemini, DeepSeek y/o OpenRouter) y tus
-   instrucciones para los prompts de imagen.
-2. **Perfiles** → crea perfiles pegando las instrucciones de estilo de guion y de temas
-   (ej. tono bíblico, longitud, estructura).
+1. **Ajustes** → pega tus API keys (OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter y AIRAI) y
+   elige el proveedor y modelo por defecto.
+2. **Perfiles** → crea perfiles con sus instrucciones: estilo de guion, temas y **prompts de
+   imagen** (aquí defines, por ejemplo, cuántas escenas quieres y el estilo visual).
 3. **Chat** → elige perfil, proveedor y modelo; pide un tema y el guion se genera en streaming.
-4. Pulsa **Generar prompts** para obtener los prompts de imagen del guion, y **Guardar guion**
-   para guardarlo en el **Historial**.
+4. Pulsa **Generar prompts** para obtener los prompts de imagen del guion usando las
+   instrucciones del perfil activo, y **Guardar guion** para guardarlo en el **Historial**.
+
+## Migraciones de base de datos
+
+- `supabase/schema.sql` → esquema completo para un proyecto nuevo.
+- `supabase/migrations/` → cambios incrementales para bases de datos ya creadas. Pega cada
+  archivo en el SQL Editor de Supabase en orden.
+
+Migraciones disponibles:
+
+- `0002_profile_image_instructions.sql` → mueve las instrucciones de prompts de imagen de
+  `settings` (global) a `profiles` (una por perfil) y conserva lo que ya tenías.
 
 ## Despliegue en Vercel
 
@@ -99,6 +110,7 @@ src/
     data/               # Acceso a datos
   proxy.ts              # Refresco de sesión y protección de rutas
 supabase/schema.sql     # Esquema de la base de datos + RLS
+supabase/migrations/    # Migraciones incrementales
 ```
 
 ## Comandos

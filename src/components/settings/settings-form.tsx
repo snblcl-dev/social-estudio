@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Loader2Icon, SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -11,13 +12,11 @@ import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { PROVIDERS, PROVIDER_IDS } from "@/lib/providers";
 import type { ProviderId } from "@/lib/types";
 
 interface SettingsFormProps {
   initial: {
-    image_prompt_instructions: string;
     default_provider: ProviderId;
     default_model: string;
   };
@@ -26,16 +25,12 @@ interface SettingsFormProps {
 export function SettingsForm({ initial }: SettingsFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [imageInstructions, setImageInstructions] = useState(
-    initial.image_prompt_instructions,
-  );
   const [provider, setProvider] = useState<ProviderId>(initial.default_provider);
   const [model, setModel] = useState(initial.default_model);
 
   function handleSave() {
     startTransition(async () => {
       const result = await saveSettings({
-        image_prompt_instructions: imageInstructions,
         default_provider: provider,
         default_model: model,
       });
@@ -53,24 +48,13 @@ export function SettingsForm({ initial }: SettingsFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Prompts de imagen</CardTitle>
+        <CardTitle>Modelo por defecto</CardTitle>
         <CardDescription>
-          Estas instrucciones se usan para transformar el guion en prompts de imagen. Descríbelas
-          como si hablaras con un director de arte.
+          Se usa al crear una conversación nueva. Las instrucciones de prompts de imagen ahora se
+          configuran en cada perfil.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="image-instructions">Instrucciones para los prompts de imagen</Label>
-          <Textarea
-            id="image-instructions"
-            rows={10}
-            value={imageInstructions}
-            onChange={(event) => setImageInstructions(event.target.value)}
-            placeholder="Ej. Estilo cinematográfico realista, luz cálida de atardecer, planos medios, sin texto en la imagen, paleta terrosa…"
-          />
-        </div>
-
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="default-provider">Proveedor por defecto</Label>
@@ -96,6 +80,14 @@ export function SettingsForm({ initial }: SettingsFormProps) {
             <ModelSelect provider={provider} value={model} onChange={setModel} />
           </div>
         </div>
+
+        <p className="text-xs text-muted-foreground">
+          Las instrucciones para generar los prompts de imagen (incluido el número de escenas) se
+          definen en cada perfil.{" "}
+          <Link href="/perfiles" className="underline underline-offset-4">
+            Ir a Perfiles
+          </Link>
+        </p>
 
         <div>
           <Button onClick={handleSave} disabled={isPending}>

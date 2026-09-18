@@ -42,6 +42,7 @@ const EMPTY_FORM: ProfileInput = {
   description: "",
   script_instructions: "",
   theme_instructions: "",
+  image_prompt_instructions: "",
 };
 
 interface ProfilesManagerProps {
@@ -69,6 +70,7 @@ export function ProfilesManager({ profiles }: ProfilesManagerProps) {
       description: profile.description ?? "",
       script_instructions: profile.script_instructions,
       theme_instructions: profile.theme_instructions,
+      image_prompt_instructions: profile.image_prompt_instructions ?? "",
     });
     setDialogOpen(true);
   }
@@ -149,6 +151,10 @@ export function ProfilesManager({ profiles }: ProfilesManagerProps) {
                   <Badge variant="secondary">
                     Temas: {profile.theme_instructions.trim().length} caracteres
                   </Badge>
+                  <Badge variant="secondary">
+                    Prompts de imagen:{" "}
+                    {(profile.image_prompt_instructions ?? "").trim().length} caracteres
+                  </Badge>
                 </div>
 
                 <div className="flex gap-2">
@@ -225,6 +231,25 @@ export function ProfilesManager({ profiles }: ProfilesManagerProps) {
                 rows={8}
                 placeholder="Ej. Los temas deben ser historias del Antiguo Testamento poco conocidas, con una aplicación práctica para hoy…"
               />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="profile-image-prompts">
+                Instrucciones de prompts de imagen
+              </Label>
+              <Textarea
+                id="profile-image-prompts"
+                value={form.image_prompt_instructions}
+                onChange={(event) =>
+                  setForm({ ...form, image_prompt_instructions: event.target.value })
+                }
+                rows={8}
+                placeholder="Ej. Genera 12 escenas por guion. Estilo cinematográfico realista, luz cálida, planos medios, sin texto en la imagen…"
+              />
+              <p className="text-xs text-muted-foreground">
+                Aquí puedes indicar cuántas escenas quieres y el estilo visual. Se usan al pulsar
+                «Generar prompts» en el chat.
+              </p>
             </div>
           </div>
 

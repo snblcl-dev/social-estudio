@@ -19,7 +19,6 @@ export async function getSettings(userId: string): Promise<UserSettings> {
 
   return {
     user_id: userId,
-    image_prompt_instructions: "",
     default_provider: "openai",
     default_model: "",
     updated_at: new Date().toISOString(),

@@ -5,7 +5,7 @@ import {
   toUIMessageStream,
   type UIMessage,
 } from "ai";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 
 import { MissingApiKeyError, resolveModelForUser } from "@/lib/ai/model";
@@ -77,7 +77,13 @@ async function persistConversation(
     }));
 
   if (rows.length > 0) {
-    await supabase.from("messages").upsert(rows, { onConflict: "id" });
+    const { error: messagesError } = await supabase
+      .from("messages")
+      .upsert(rows, { onConflict: "id" });
+
+    if (messagesError) {
+      console.error("[api/chat] error al guardar mensajes", messagesError);
+    }
   }
 
   const firstUserMessage = messages.find((message) => message.role === "user");
@@ -94,7 +100,15 @@ async function persistConversation(
   if (title) updates.title = title;
   if (meta.profileId) updates.profile_id = meta.profileId;
 
-  await supabase.from("conversations").update(updates).eq("id", conversationId).eq("user_id", userId);
+  const { error: conversationError } = await supabase
+    .from("conversations")
+    .update(updates)
+    .eq("id", conversationId)
+    .eq("user_id", userId);
+
+  if (conversationError) {
+    console.error("[api/chat] error al actualizar la conversación", conversationError);
+  }
 }
 
 function extractText(message: UIMessage) {
@@ -147,16 +161,46 @@ export async function POST(request: Request) {
       messages: await convertToModelMessages(messages),
     });
 
+    // Garantiza que el stream se consuma del todo (y que onEnd se dispare)
+    // aunque el cliente cierre la pestaña o se desconecte.
+    result.consumeStream();
+
+    let resolveFinalMessages: (value: UIMessage[]) => void = () => {};
+    const finalMessages = new Promise<UIMessage[]>((resolve) => {
+      resolveFinalMessages = resolve;
+    });
+
+    // `after` se ejecuta cuando la respuesta ha terminado, pero conserva el
+    // contexto de la petición: por eso `cookies()` funciona dentro y la
+    // escritura en Supabase no queda bloqueada por RLS.
+    after(async () => {
+      try {
+        const completed = await Promise.race([
+          finalMessages,
+          new Promise<UIMessage[]>((resolve) => setTimeout(() => resolve([]), 30000)),
+        ]);
+
+        if (completed.length === 0) {
+          console.warn("[api/chat] no se recibieron mensajes finales para guardar");
+          return;
+        }
+
+        await persistConversation(user.id, conversationId, completed, {
+          provider,
+          model,
+          profileId: profileId ?? null,
+        });
+      } catch (persistError) {
+        console.error("[api/chat] error al guardar la conversación", persistError);
+      }
+    });
+
     return createUIMessageStreamResponse({
       stream: toUIMessageStream({
         stream: result.stream,
         originalMessages: messages,
-        onEnd: async ({ messages: finalMessages }) => {
-          await persistConversation(user.id, conversationId, finalMessages, {
-            provider,
-            model,
-            profileId: profileId ?? null,
-          });
+        onEnd: ({ messages: done }) => {
+          resolveFinalMessages(done);
         },
       }),
     });

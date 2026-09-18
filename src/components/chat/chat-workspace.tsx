@@ -29,7 +29,6 @@ interface ChatWorkspaceProps {
   conversation: Conversation;
   profiles: Profile[];
   initialMessages: UIMessage[];
-  hasImageInstructions: boolean;
 }
 
 function textOf(message: UIMessage) {
@@ -52,7 +51,6 @@ export function ChatWorkspace({
   conversation,
   profiles,
   initialMessages,
-  hasImageInstructions,
 }: ChatWorkspaceProps) {
   const router = useRouter();
   const [initial] = useState(initialMessages);
@@ -90,8 +88,10 @@ export function ChatWorkspace({
     return "";
   }, [messages]);
 
-  const visiblePrompts =
-    hasImageInstructions && promptsSource === lastAssistantText ? imagePrompts : [];
+  const activeProfile = profiles.find((profile) => profile.id === profileId) ?? null;
+  const hasImageInstructions = Boolean(activeProfile?.image_prompt_instructions?.trim());
+
+  const visiblePrompts = promptsSource === lastAssistantText ? imagePrompts : [];
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -144,7 +144,12 @@ export function ChatWorkspace({
       const response = await fetch("/api/image-prompts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ script: lastAssistantText, provider, model }),
+        body: JSON.stringify({
+          script: lastAssistantText,
+          provider,
+          model,
+          profileId: profileId || null,
+        }),
       });
 
       const data = (await response.json()) as { imagePrompts?: ImagePrompt[]; error?: string };
@@ -345,13 +350,16 @@ export function ChatWorkspace({
               Prompts de imagen
             </CardTitle>
             <CardDescription>
-              Se generan a partir del último guion usando tus instrucciones de Ajustes.
+              Se generan a partir del último guion usando las instrucciones de prompts de imagen
+              del perfil activo.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {!hasImageInstructions ? (
               <p className="text-xs text-amber-600 dark:text-amber-500">
-                Añade tus instrucciones de prompts de imagen en Ajustes para mejores resultados.
+                {profileId
+                  ? "Este perfil no tiene instrucciones de prompts de imagen. Añádelas en Perfiles para controlar el número de escenas y el estilo."
+                  : "Elige un perfil (arriba) para usar sus instrucciones de prompts de imagen, o añádelas en Perfiles."}
               </p>
             ) : null}
 

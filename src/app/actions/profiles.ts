@@ -10,6 +10,7 @@ const profileSchema = z.object({
   description: z.string().trim().max(300).optional().default(""),
   script_instructions: z.string().trim().max(50000).optional().default(""),
   theme_instructions: z.string().trim().max(50000).optional().default(""),
+  image_prompt_instructions: z.string().trim().max(50000).optional().default(""),
 });
 
 export type ProfileInput = z.input<typeof profileSchema>;

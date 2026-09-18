@@ -64,7 +64,6 @@ export default async function ChatPage({
           conversation={conversation}
           profiles={profiles}
           initialMessages={initialMessages}
-          hasImageInstructions={settings.image_prompt_instructions.trim().length > 0}
         />
       ) : (
         <Card>

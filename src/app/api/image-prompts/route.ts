@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { MissingApiKeyError, resolveModelForUser } from "@/lib/ai/model";
-import { getSettings } from "@/lib/data/settings";
+import { getProfile } from "@/lib/data/profiles";
 import { isProviderId } from "@/lib/providers";
 import { getCurrentUser } from "@/lib/supabase/server";
 import type { ImagePrompt, ProviderId } from "@/lib/types";
@@ -14,7 +14,8 @@ const bodySchema = z.object({
   script: z.string().trim().min(1, "No hay guion para analizar."),
   provider: z.string(),
   model: z.string(),
-  scenes: z.number().int().min(1).max(20).optional(),
+  profileId: z.string().uuid().nullable().optional(),
+  scenes: z.number().int().min(1).max(50).optional(),
 });
 
 const BASE_INSTRUCTIONS = `Eres un director de arte especializado en imágenes para redes sociales.
@@ -58,25 +59,28 @@ export async function POST(request: Request) {
     );
   }
 
-  const { script, provider, model, scenes } = parsed.data;
+  const { script, provider, model, profileId, scenes } = parsed.data;
 
   if (!isProviderId(provider)) {
     return NextResponse.json({ error: "Proveedor inválido." }, { status: 400 });
   }
 
   try {
-    const settings = await getSettings(user.id);
+    const profile = profileId ? await getProfile(user.id, profileId) : null;
+    const userInstructions = profile?.image_prompt_instructions?.trim() ?? "";
     const languageModel = await resolveModelForUser(user.id, provider as ProviderId, model);
 
-    const instructions = settings.image_prompt_instructions
-      ? `${BASE_INSTRUCTIONS}\n\n## Instrucciones de estilo del usuario (prioritarias)\n${settings.image_prompt_instructions}`
+    const instructions = userInstructions
+      ? `${BASE_INSTRUCTIONS}\n\n## Instrucciones de estilo del usuario (prioritarias)\n${userInstructions}`
       : BASE_INSTRUCTIONS;
 
-    const prompt = [
-      scenes ? `Genera exactamente ${scenes} prompts de imagen.` : "Genera entre 3 y 6 prompts de imagen.",
-      "Guion:",
-      script,
-    ].join("\n\n");
+    const countLine = scenes
+      ? `Genera exactamente ${scenes} prompts de imagen.`
+      : userInstructions
+        ? "Genera un prompt de imagen por cada escena del guion, respetando el número de escenas y el estilo indicados en las instrucciones del usuario."
+        : "Genera entre 3 y 6 prompts de imagen.";
+
+    const prompt = [countLine, "Guion:", script].join("\n\n");
 
     const { output } = await generateText({
       model: languageModel,

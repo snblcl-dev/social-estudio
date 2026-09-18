@@ -8,13 +8,11 @@ import { isProviderId } from "@/lib/providers";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 const settingsSchema = z.object({
-  image_prompt_instructions: z.string().trim().max(50000),
   default_provider: z.string(),
   default_model: z.string().trim().max(200),
 });
 
 export interface SettingsInput {
-  image_prompt_instructions: string;
   default_provider: string;
   default_model: string;
 }
@@ -46,7 +44,6 @@ export async function saveSettings(input: SettingsInput): Promise<ActionResult> 
   const { error } = await supabase.from("settings").upsert(
     {
       user_id: user.id,
-      image_prompt_instructions: parsed.data.image_prompt_instructions,
       default_provider: parsed.data.default_provider,
       default_model: parsed.data.default_model,
       updated_at: new Date().toISOString(),

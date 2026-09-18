@@ -13,6 +13,7 @@ create table if not exists public.profiles (
   description text not null default '',
   script_instructions text not null default '',
   theme_instructions text not null default '',
+  image_prompt_instructions text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -20,11 +21,10 @@ create table if not exists public.profiles (
 create index if not exists profiles_user_id_idx on public.profiles (user_id, name);
 
 -- ---------------------------------------------------------------------------
--- SETTINGS: una fila por usuario (instrucciones de prompts de imagen + defaults)
+-- SETTINGS: una fila por usuario (proveedor y modelo por defecto)
 -- ---------------------------------------------------------------------------
 create table if not exists public.settings (
   user_id uuid primary key references auth.users (id) on delete cascade,
-  image_prompt_instructions text not null default '',
   default_provider text not null default 'openai',
   default_model text not null default '',
   updated_at timestamptz not null default now()

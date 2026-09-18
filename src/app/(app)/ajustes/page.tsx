@@ -26,8 +26,8 @@ export default async function SettingsPage() {
       <div>
         <h1 className="font-heading text-lg font-semibold">Ajustes</h1>
         <p className="text-sm text-muted-foreground">
-          Configura tus claves de IA y las instrucciones con las que se generan los prompts de
-          imagen.
+          Configura tus claves de IA y el modelo por defecto. Las instrucciones de prompts de
+          imagen se definen en cada perfil.
         </p>
       </div>
 
@@ -35,7 +35,6 @@ export default async function SettingsPage() {
 
       <SettingsForm
         initial={{
-          image_prompt_instructions: settings.image_prompt_instructions,
           default_provider: defaultProvider,
           default_model: settings.default_model,
         }}
