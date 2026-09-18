@@ -16,11 +16,11 @@ import {
 import { toast } from "sonner";
 
 import { saveScript } from "@/app/actions/scripts";
+import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useProviderModels } from "@/hooks/use-provider-models";
 import { PROVIDERS } from "@/lib/providers";
 import type { Conversation, ImagePrompt, Profile, ProviderId } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -78,8 +78,6 @@ export function ChatWorkspace({
   });
 
   const isBusy = status === "submitted" || status === "streaming";
-
-  const models = useProviderModels(provider);
 
   const lastAssistantText = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -243,18 +241,9 @@ export function ChatWorkspace({
             <Label htmlFor="chat-model" className="text-xs">
               Modelo
             </Label>
-            <input
-              id="chat-model"
-              list="chat-model-options"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-              className="h-8 w-48 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-            />
-            <datalist id="chat-model-options">
-              {models.map((model) => (
-                <option key={model} value={model} />
-              ))}
-            </datalist>
+            <div className="w-56">
+              <ModelSelect provider={provider} value={model} onChange={setModel} />
+            </div>
           </div>
         </div>
 

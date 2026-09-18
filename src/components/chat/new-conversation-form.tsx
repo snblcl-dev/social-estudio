@@ -7,10 +7,10 @@ import { Loader2Icon, PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { createConversation } from "@/app/actions/conversations";
+import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { useProviderModels } from "@/hooks/use-provider-models";
 import { PROVIDERS } from "@/lib/providers";
 import type { Profile, ProviderId } from "@/lib/types";
 
@@ -44,8 +44,6 @@ export function NewConversationForm({
       : PROVIDERS[initialProvider].defaultModel,
   );
   const [profileId, setProfileId] = useState<string>(profiles[0]?.id ?? "");
-
-  const models = useProviderModels(provider);
 
   function handleProviderChange(next: ProviderId) {
     setProvider(next);
@@ -114,19 +112,7 @@ export function NewConversationForm({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="new-model">Modelo</Label>
-          <input
-            id="new-model"
-            list="new-model-options"
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-            className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-            placeholder={PROVIDERS[provider].defaultModel}
-          />
-          <datalist id="new-model-options">
-            {models.map((model) => (
-              <option key={model} value={model} />
-            ))}
-          </datalist>
+          <ModelSelect provider={provider} value={model} onChange={setModel} />
         </div>
       </div>
 
