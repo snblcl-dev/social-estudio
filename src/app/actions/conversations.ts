@@ -20,7 +20,8 @@ const saveMessagesSchema = z.object({
   messages: z
     .array(
       z.object({
-        id: z.string().min(1),
+        // El AI SDK puede entregar ids vacíos; se sustituyen por uno estable.
+        id: z.string(),
         role: z.enum(["user", "assistant", "system"]),
         parts: z.array(z.unknown()),
       }),
@@ -61,7 +62,7 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
   const rows = parsed.data.messages
     .filter((message) => message.role === "user" || message.role === "assistant")
     .map((message, index) => ({
-      id: message.id,
+      id: message.id || `${parsed.data.conversationId}:${index}`,
       conversation_id: parsed.data.conversationId,
       user_id: user.id,
       role: message.role,

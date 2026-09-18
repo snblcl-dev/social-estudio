@@ -1,5 +1,6 @@
 import {
   convertToModelMessages,
+  createIdGenerator,
   createUIMessageStreamResponse,
   streamText,
   toUIMessageStream,
@@ -16,6 +17,10 @@ import { createClient, createClientWithToken } from "@/lib/supabase/server";
 import type { Profile, ProviderId } from "@/lib/types";
 
 export const maxDuration = 60;
+
+// Sin esto, el AI SDK no asigna id a los mensajes del asistente y llegan con
+// id vacío; al ser `id` la clave primaria, todos colisionarían y se perderían.
+const generateMessageId = createIdGenerator({ prefix: "msg", size: 16 });
 
 const bodySchema = z.object({
   conversationId: z.string().uuid("Conversación inválida."),
@@ -69,7 +74,7 @@ async function persistConversation(
   const rows = messages
     .filter((message) => message.role === "user" || message.role === "assistant")
     .map((message, index) => ({
-      id: message.id,
+      id: message.id || `${conversationId}:${index}`,
       conversation_id: conversationId,
       user_id: userId,
       role: message.role,
@@ -221,6 +226,7 @@ export async function POST(request: Request) {
       stream: toUIMessageStream({
         stream: result.stream,
         originalMessages: messages,
+        generateMessageId,
         onEnd: ({ messages: done }) => {
           resolveFinalMessages(done);
         },

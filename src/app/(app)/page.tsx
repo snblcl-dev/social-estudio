@@ -42,11 +42,13 @@ export default async function ChatPage({
   if (conversation) {
     const rows = await listMessages(user.id, conversation.id);
 
-    initialMessages = rows.map((row) => ({
-      id: row.id,
-      role: row.role,
-      parts: row.parts,
-    })) as UIMessage[];
+    initialMessages = rows
+      .filter((row) => row.id.trim().length > 0)
+      .map((row) => ({
+        id: row.id,
+        role: row.role,
+        parts: row.parts,
+      })) as UIMessage[];
   }
 
   return (
