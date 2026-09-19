@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { Nav } from "@/components/nav";
+import { AppSidebar } from "@/components/app-sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { listConversations } from "@/lib/data/conversations";
 import { isSupabaseConfigured } from "@/lib/env";
 import { getCurrentUser } from "@/lib/supabase/server";
 
@@ -36,10 +38,16 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect("/login");
   }
 
+  const conversations = await listConversations(user.id);
+
   return (
-    <div className="flex min-h-dvh flex-col">
-      <Nav />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
+    <div className="flex h-dvh overflow-hidden">
+      <Suspense fallback={<div className="w-64 shrink-0 border-r border-border/60 bg-sidebar/60" />}>
+        <AppSidebar conversations={conversations} />
+      </Suspense>
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </main>
     </div>
   );
 }

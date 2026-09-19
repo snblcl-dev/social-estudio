@@ -11,5 +11,9 @@ export default async function ProfilesPage() {
 
   const profiles = await listProfiles(user.id);
 
-  return <ProfilesManager profiles={profiles} />;
+  return (
+    <div className="flex-1 overflow-y-auto p-6">
+      <ProfilesManager profiles={profiles} />
+    </div>
+  );
 }

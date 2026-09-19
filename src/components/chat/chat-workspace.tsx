@@ -11,6 +11,7 @@ import {
   Loader2Icon,
   SaveIcon,
   SendIcon,
+  Settings2Icon,
   SparklesIcon,
   SquareIcon,
   UserIcon,
@@ -54,8 +55,10 @@ export function ChatWorkspace({
   );
   const [profileId, setProfileId] = useState(conversation.profile_id ?? "");
   const [isSavingScript, setIsSavingScript] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const settingsRef = useRef<HTMLDivElement>(null);
   const savedSignatureRef = useRef(
     `${initial.length}:${initial[initial.length - 1]?.id ?? ""}`,
   );
@@ -101,6 +104,28 @@ export function ChatWorkspace({
       }
     });
   }, [status, messages, conversation.id, provider, model, profileId]);
+
+  useEffect(() => {
+    if (!showSettings) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettings(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setShowSettings(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [showSettings]);
 
   const lastAssistantText = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -221,92 +246,7 @@ export function ChatWorkspace({
   }
 
   return (
-    <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-4">
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border/60 bg-card/50 p-3 backdrop-blur-sm">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="chat-profile" className="text-xs text-muted-foreground">
-            Perfil
-          </Label>
-          <NativeSelect
-            id="chat-profile"
-            value={profileId}
-            className="w-44"
-            onChange={(event) => setProfileId(event.target.value)}
-          >
-            <option value="">Sin perfil</option>
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="chat-provider" className="text-xs text-muted-foreground">
-            Proveedor
-          </Label>
-          <NativeSelect
-            id="chat-provider"
-            value={provider}
-            className="w-40"
-            onChange={(event) => handleProviderChange(event.target.value as ProviderId)}
-          >
-            {Object.values(PROVIDERS).map((info) => (
-              <option key={info.id} value={info.id}>
-                {info.label}
-              </option>
-            ))}
-          </NativeSelect>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="chat-model" className="text-xs text-muted-foreground">
-            Modelo
-          </Label>
-          <div className="w-56">
-            <ModelSelect provider={provider} value={model} onChange={setModel} />
-          </div>
-        </div>
-
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div className="mr-1 hidden max-w-[18rem] items-center gap-2 rounded-lg border border-border/60 bg-muted/50 px-2.5 py-1.5 text-xs xl:flex">
-            <ImageIcon className="size-3.5 shrink-0 text-accent" />
-            <span className="truncate text-muted-foreground">
-              {activeProfile ? (
-                hasImageInstructions ? (
-                  <>Imagen: {activeProfile.name}</>
-                ) : (
-                  <span className="text-amber-500">
-                    «{activeProfile.name}» sin instrucciones de imagen
-                  </span>
-                )
-              ) : (
-                <span className="text-amber-500">Imagen: genéricas (3-6 escenas)</span>
-              )}
-            </span>
-          </div>
-
-          <Button
-            variant="secondary"
-            onClick={handleGenerateImagePrompts}
-            disabled={isBusy || !lastAssistantText}
-          >
-            {isBusy ? <Loader2Icon className="animate-spin" /> : <SparklesIcon />}
-            Pedir prompts de imagen
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={handleSaveScript}
-            disabled={isSavingScript || !lastAssistantText}
-          >
-            {isSavingScript ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
-            Guardar
-          </Button>
-        </div>
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto rounded-xl border border-border/60 bg-card/40 p-4 backdrop-blur-sm"
@@ -408,7 +348,7 @@ export function ChatWorkspace({
           className="w-full resize-none rounded-lg border border-input bg-input/20 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={isBusy || input.trim().length === 0}>
             {isBusy ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
             Enviar
@@ -421,17 +361,121 @@ export function ChatWorkspace({
             </Button>
           ) : null}
 
-          <p className="ml-auto hidden text-xs text-muted-foreground sm:block">
-            Los prompts aparecerán como un mensaje del asistente. Gestiona las instrucciones en{" "}
-            <Link href="/perfiles" className="text-primary underline underline-offset-4">
-              Perfiles
-            </Link>
-            .
-          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGenerateImagePrompts}
+            disabled={isBusy || !lastAssistantText}
+            title="Pedir prompts de imagen al modelo"
+          >
+            <SparklesIcon />
+            Prompts de imagen
+          </Button>
 
-          <span className="ml-auto rounded-full bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground sm:ml-0">
-            {model}
-          </span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleSaveScript}
+            disabled={isSavingScript || !lastAssistantText}
+            title="Guardar la última respuesta en el historial"
+          >
+            {isSavingScript ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
+            Guardar
+          </Button>
+
+          <div ref={settingsRef} className="relative ml-auto">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowSettings((value) => !value)}
+              aria-expanded={showSettings}
+              aria-haspopup="true"
+            >
+              <Settings2Icon />
+              Ajustes
+              <span className="hidden max-w-[10rem] truncate rounded-full bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground md:inline">
+                {model}
+              </span>
+            </Button>
+
+            {showSettings ? (
+              <div className="absolute right-0 bottom-full z-30 mb-2 w-72 rounded-xl border border-border/60 bg-popover p-4 text-popover-foreground shadow-xl shadow-black/40">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="chat-profile" className="text-xs text-muted-foreground">
+                      Perfil
+                    </Label>
+                    <NativeSelect
+                      id="chat-profile"
+                      value={profileId}
+                      className="w-full"
+                      onChange={(event) => setProfileId(event.target.value)}
+                    >
+                      <option value="">Sin perfil</option>
+                      {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="chat-provider" className="text-xs text-muted-foreground">
+                      Proveedor
+                    </Label>
+                    <NativeSelect
+                      id="chat-provider"
+                      value={provider}
+                      className="w-full"
+                      onChange={(event) =>
+                        handleProviderChange(event.target.value as ProviderId)
+                      }
+                    >
+                      {Object.values(PROVIDERS).map((info) => (
+                        <option key={info.id} value={info.id}>
+                          {info.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="chat-model" className="text-xs text-muted-foreground">
+                      Modelo
+                    </Label>
+                    <ModelSelect provider={provider} value={model} onChange={setModel} />
+                  </div>
+
+                  <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/50 px-2.5 py-2 text-xs">
+                    <ImageIcon className="mt-0.5 size-3.5 shrink-0 text-accent" />
+                    <span className="text-muted-foreground">
+                      {activeProfile ? (
+                        hasImageInstructions ? (
+                          <>Prompts de imagen: {activeProfile.name}</>
+                        ) : (
+                          <span className="text-amber-500">
+                            «{activeProfile.name}» no tiene instrucciones de imagen. Añádelas en{" "}
+                            <Link
+                              href="/perfiles"
+                              className="text-primary underline underline-offset-4"
+                            >
+                              Perfiles
+                            </Link>
+                            .
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-amber-500">
+                          Sin perfil: se usarán instrucciones genéricas (3-6 escenas).
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </form>
     </div>

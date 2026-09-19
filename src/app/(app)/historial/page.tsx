@@ -17,7 +17,7 @@ export default async function HistoryPage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
       <PageHeader title="Historial" description="Guiones guardados y sus prompts de imagen." />
 
       <ScriptsList scripts={scripts} profiles={profiles} />

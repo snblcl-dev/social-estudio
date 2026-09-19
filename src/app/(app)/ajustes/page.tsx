@@ -23,7 +23,7 @@ export default async function SettingsPage() {
     : "openai";
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
       <PageHeader
         title="Ajustes"
         description="Configura tus claves de IA y el modelo por defecto. Las instrucciones de prompts de imagen se definen en cada perfil."
