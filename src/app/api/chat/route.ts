@@ -204,6 +204,14 @@ export async function POST(request: Request) {
     const profile = profileId ? await getProfile(user.id, profileId) : null;
     const languageModel = await resolveModelForUser(user.id, provider as ProviderId, model);
 
+    if (mode === "image-prompts") {
+      console.log("[api/chat] generando prompts de imagen", {
+        profileId: profileId ?? null,
+        perfilEncontrado: Boolean(profile),
+        caracteresInstrucciones: profile?.image_prompt_instructions?.trim().length ?? 0,
+      });
+    }
+
     const result = streamText({
       model: languageModel,
       instructions:
