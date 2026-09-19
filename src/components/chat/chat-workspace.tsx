@@ -6,12 +6,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  BotIcon,
   ImageIcon,
   Loader2Icon,
   SaveIcon,
   SendIcon,
   SparklesIcon,
   SquareIcon,
+  UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -222,9 +224,9 @@ export function ChatWorkspace({
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="flex min-h-[70vh] flex-col gap-4">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border/60 bg-card/50 p-3 backdrop-blur-sm">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="chat-profile" className="text-xs">
+            <Label htmlFor="chat-profile" className="text-xs text-muted-foreground">
               Perfil
             </Label>
             <NativeSelect
@@ -243,7 +245,7 @@ export function ChatWorkspace({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="chat-provider" className="text-xs">
+            <Label htmlFor="chat-provider" className="text-xs text-muted-foreground">
               Proveedor
             </Label>
             <NativeSelect
@@ -261,7 +263,7 @@ export function ChatWorkspace({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="chat-model" className="text-xs">
+            <Label htmlFor="chat-model" className="text-xs text-muted-foreground">
               Modelo
             </Label>
             <div className="w-56">
@@ -272,37 +274,55 @@ export function ChatWorkspace({
 
         <div
           ref={scrollRef}
-          className="flex-1 overflow-y-auto rounded-xl border bg-card p-4"
+          className="flex-1 overflow-y-auto rounded-xl border border-border/60 bg-card/40 p-4 backdrop-blur-sm"
           style={{ maxHeight: "60vh" }}
         >
           {messages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-              <SparklesIcon className="size-6" />
-              <p className="max-w-md">
-                Escribe el tema o la idea que quieres convertir en guion. También puedes pedir
-                sugerencias de temas.
-              </p>
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+              <span className="glow-primary flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <SparklesIcon className="size-6" />
+              </span>
+              <div className="flex flex-col gap-1">
+                <p className="font-heading text-base font-semibold">Empieza tu guion</p>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  Escribe el tema o la idea que quieres convertir en guion. También puedes pedir
+                  sugerencias de temas.
+                </p>
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-5">
               {messages.map((message) => {
                 const text = textOf(message);
                 if (!text) return null;
 
+                const isUser = message.role === "user";
+
                 return (
                   <div
                     key={message.id}
-                    className={cn(
-                      "flex",
-                      message.role === "user" ? "justify-end" : "justify-start",
-                    )}
+                    className={cn("flex gap-3", isUser ? "flex-row-reverse" : "flex-row")}
                   >
+                    <span
+                      className={cn(
+                        "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+                        isUser
+                          ? "bg-secondary text-secondary-foreground"
+                          : "bg-primary/15 text-primary",
+                      )}
+                    >
+                      {isUser ? (
+                        <UserIcon className="size-3.5" />
+                      ) : (
+                        <BotIcon className="size-3.5" />
+                      )}
+                    </span>
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm break-words whitespace-pre-wrap",
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground",
+                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm break-words whitespace-pre-wrap",
+                        isUser
+                          ? "rounded-tr-sm bg-primary text-primary-foreground"
+                          : "rounded-tl-sm border border-border/60 bg-muted/60 text-foreground",
                       )}
                     >
                       {text}
@@ -312,9 +332,14 @@ export function ChatWorkspace({
               })}
 
               {isBusy ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2Icon className="size-4 animate-spin" />
-                  Generando…
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                    <BotIcon className="size-3.5" />
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Loader2Icon className="size-4 animate-spin" />
+                    Generando…
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -322,12 +347,18 @@ export function ChatWorkspace({
         </div>
 
         {error ? (
-          <p className="text-sm text-destructive" role="alert">
+          <p
+            className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
             {error.message}
           </p>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-2 rounded-xl border border-border/60 bg-card/50 p-3 backdrop-blur-sm"
+        >
           <textarea
             value={input}
             onChange={(event) => setInput(event.target.value)}
@@ -338,8 +369,9 @@ export function ChatWorkspace({
               }
             }}
             rows={3}
+            aria-label="Mensaje para el asistente"
             placeholder="Escribe tu tema o petición… (Enter para enviar, Shift+Enter para salto de línea)"
-            className="w-full resize-y rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+            className="w-full resize-y rounded-lg border border-input bg-input/20 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           />
 
           <div className="flex items-center gap-2">
@@ -355,7 +387,9 @@ export function ChatWorkspace({
               </Button>
             ) : null}
 
-            <span className="ml-auto text-xs text-muted-foreground">{model}</span>
+            <span className="ml-auto rounded-full bg-muted px-2.5 py-1 font-mono text-xs text-muted-foreground">
+              {model}
+            </span>
           </div>
         </form>
       </div>
@@ -364,7 +398,9 @@ export function ChatWorkspace({
         <Card size="sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ImageIcon className="size-4" />
+              <span className="flex size-6 items-center justify-center rounded-md bg-accent/15 text-accent">
+                <ImageIcon className="size-3.5" />
+              </span>
               Prompts de imagen
             </CardTitle>
             <CardDescription>
@@ -373,7 +409,7 @@ export function ChatWorkspace({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            <div className="rounded-lg bg-muted p-2.5 text-xs">
+            <div className="rounded-lg border border-border/60 bg-muted/50 p-2.5 text-xs">
               {activeProfile ? (
                 hasImageInstructions ? (
                   <>
@@ -383,13 +419,13 @@ export function ChatWorkspace({
                     instrucciones de imagen.
                   </>
                 ) : (
-                  <span className="text-amber-600 dark:text-amber-500">
+                  <span className="text-amber-500">
                     El perfil «{activeProfile.name}» no tiene instrucciones de prompts de imagen.
                     Añádelas en Perfiles.
                   </span>
                 )
               ) : (
-                <span className="text-amber-600 dark:text-amber-500">
+                <span className="text-amber-500">
                   Sin perfil seleccionado: se usarán instrucciones genéricas (3-6 escenas).
                 </span>
               )}
@@ -416,7 +452,7 @@ export function ChatWorkspace({
             <p className="text-xs text-muted-foreground">
               Los prompts aparecerán como un mensaje del asistente; puedes copiarlos desde ahí.
               Gestiona las instrucciones en{" "}
-              <Link href="/perfiles" className="underline underline-offset-4">
+              <Link href="/perfiles" className="text-primary underline underline-offset-4">
                 Perfiles
               </Link>
               .

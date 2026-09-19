@@ -58,8 +58,8 @@ export function ConversationSidebar({ conversations, activeId }: ConversationSid
             <Link
               href={`/?c=${conversation.id}`}
               className={cn(
-                "flex flex-col gap-0.5 rounded-lg px-2 py-1.5 pr-8 text-sm transition-colors hover:bg-muted",
-                isActive && "bg-muted",
+                "flex flex-col gap-0.5 rounded-lg border-l-2 border-transparent px-2.5 py-2 pr-8 text-sm transition-colors hover:bg-muted",
+                isActive && "border-primary bg-primary/10 text-primary",
               )}
             >
               <span className="line-clamp-1">{conversation.title}</span>

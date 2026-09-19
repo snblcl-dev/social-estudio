@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -35,6 +35,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/page-header";
 import type { Profile } from "@/lib/types";
 
 const EMPTY_FORM: ProfileInput = {
@@ -111,34 +112,37 @@ export function ProfilesManager({ profiles }: ProfilesManagerProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-lg font-semibold">Perfiles</h1>
-          <p className="text-sm text-muted-foreground">
-            Cada perfil define el estilo de guion y los temas que se usarán en el chat.
-          </p>
-        </div>
-
-        <Button onClick={openCreate}>
-          <PlusIcon />
-          Nuevo perfil
-        </Button>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Perfiles"
+        description="Cada perfil define el estilo de guion y los temas que se usarán en el chat."
+        actions={
+          <Button onClick={openCreate}>
+            <PlusIcon />
+            Nuevo perfil
+          </Button>
+        }
+      />
 
       {profiles.length === 0 ? (
         <Card>
-          <CardContent className="py-8 text-center text-sm text-muted-foreground">
-            Todavía no hay perfiles. Crea el primero para definir, por ejemplo, un estilo
-            bíblico, motivacional o de curiosidades.
+          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <UsersIcon className="size-5" />
+            </span>
+            <p className="font-medium">Todavía no hay perfiles</p>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Crea el primero para definir, por ejemplo, un estilo bíblico, motivacional o de
+              curiosidades.
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {profiles.map((profile) => (
-            <Card key={profile.id}>
+            <Card key={profile.id} className="transition-colors hover:ring-primary/30">
               <CardHeader>
-                <CardTitle>{profile.name}</CardTitle>
+                <CardTitle className="font-heading">{profile.name}</CardTitle>
                 <CardDescription className="line-clamp-2">
                   {profile.description || "Sin descripción"}
                 </CardDescription>

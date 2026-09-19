@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="rounded-lg bg-muted p-3 font-mono text-xs">
+            <pre className="rounded-lg border border-border/60 bg-muted/50 p-3 font-mono text-xs">
               NEXT_PUBLIC_SUPABASE_URL{"\n"}
               NEXT_PUBLIC_SUPABASE_ANON_KEY{"\n"}
               API_KEY_ENCRYPTION_SECRET
@@ -39,7 +39,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <Nav />
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CopyIcon, EyeIcon, Loader2Icon, Trash2Icon } from "lucide-react";
+import { CopyIcon, EyeIcon, FileTextIcon, Loader2Icon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteScript } from "@/app/actions/scripts";
@@ -65,8 +65,14 @@ export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
   if (scripts.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          Todavía no has guardado ningún guion. Genera uno en el chat y pulsa «Guardar guion».
+        <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <FileTextIcon className="size-5" />
+          </span>
+          <p className="font-medium">Todavía no has guardado ningún guion</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Genera uno en el chat y pulsa «Guardar respuesta en historial».
+          </p>
         </CardContent>
       </Card>
     );
@@ -75,9 +81,9 @@ export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {scripts.map((script) => (
-        <Card key={script.id}>
+        <Card key={script.id} className="transition-colors hover:ring-primary/30">
           <CardHeader>
-            <CardTitle className="line-clamp-1">{script.title}</CardTitle>
+            <CardTitle className="line-clamp-1 font-heading">{script.title}</CardTitle>
             <CardDescription className="flex flex-wrap items-center gap-2">
               <span>
                 {new Date(script.created_at).toLocaleDateString("es-ES", {
@@ -165,7 +171,7 @@ export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
                   Copiar
                 </Button>
               </div>
-              <p className="rounded-lg bg-muted p-3 text-sm whitespace-pre-wrap">
+              <p className="rounded-lg border border-border/60 bg-muted/50 p-3 text-sm whitespace-pre-wrap">
                 {openScript?.content}
               </p>
             </div>
@@ -175,7 +181,7 @@ export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
                 <h3 className="mb-2 text-sm font-medium">Prompts de imagen</h3>
                 <div className="flex flex-col gap-2">
                   {openScript.image_prompts.map((item) => (
-                    <div key={item.index} className="rounded-lg bg-muted p-3">
+                    <div key={item.index} className="rounded-lg border border-border/60 bg-muted/50 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium">
                           {item.index}. {item.scene}

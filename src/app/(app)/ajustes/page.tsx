@@ -1,5 +1,6 @@
 import { ApiKeysPanel } from "@/components/settings/api-keys-panel";
 import { SettingsForm } from "@/components/settings/settings-form";
+import { PageHeader } from "@/components/page-header";
 import { getSettings, listApiKeySummaries } from "@/lib/data/settings";
 import { isProviderId } from "@/lib/providers";
 import { getCurrentUser } from "@/lib/supabase/server";
@@ -23,13 +24,10 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-heading text-lg font-semibold">Ajustes</h1>
-        <p className="text-sm text-muted-foreground">
-          Configura tus claves de IA y el modelo por defecto. Las instrucciones de prompts de
-          imagen se definen en cada perfil.
-        </p>
-      </div>
+      <PageHeader
+        title="Ajustes"
+        description="Configura tus claves de IA y el modelo por defecto. Las instrucciones de prompts de imagen se definen en cada perfil."
+      />
 
       <ApiKeysPanel keys={keys} />
 
