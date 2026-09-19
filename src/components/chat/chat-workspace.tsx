@@ -5,7 +5,6 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CopyIcon,
   ImageIcon,
   Loader2Icon,
   SaveIcon,
@@ -23,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { PROVIDERS } from "@/lib/providers";
-import type { Conversation, ImagePrompt, Profile, ProviderId } from "@/lib/types";
+import type { Conversation, Profile, ProviderId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ChatWorkspaceProps {
@@ -39,15 +38,6 @@ function textOf(message: UIMessage) {
     .trim();
 }
 
-async function copyToClipboard(value: string, label: string) {
-  try {
-    await navigator.clipboard.writeText(value);
-    toast.success(`${label} copiado.`);
-  } catch {
-    toast.error("No se pudo copiar al portapapeles.");
-  }
-}
-
 export function ChatWorkspace({
   conversation,
   profiles,
@@ -61,9 +51,6 @@ export function ChatWorkspace({
     conversation.model || PROVIDERS[conversation.provider].defaultModel,
   );
   const [profileId, setProfileId] = useState(conversation.profile_id ?? "");
-  const [imagePrompts, setImagePrompts] = useState<ImagePrompt[]>([]);
-  const [promptsSource, setPromptsSource] = useState<string>("");
-  const [isGeneratingPrompts, setIsGeneratingPrompts] = useState(false);
   const [isSavingScript, setIsSavingScript] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,8 +114,6 @@ export function ChatWorkspace({
   const activeProfile = profiles.find((profile) => profile.id === profileId) ?? null;
   const hasImageInstructions = Boolean(activeProfile?.image_prompt_instructions?.trim());
 
-  const visiblePrompts = promptsSource === lastAssistantText ? imagePrompts : [];
-
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
@@ -168,50 +153,45 @@ export function ChatWorkspace({
     setModel(PROVIDERS[next].defaultModel);
   }
 
-  async function handleGeneratePrompts() {
+  async function handleGenerateImagePrompts() {
+    if (isBusy) return;
+
     if (!lastAssistantText) {
       toast.error("Todavía no hay un guion para analizar.");
       return;
     }
 
-    setIsGeneratingPrompts(true);
+    if (!hasImageInstructions) {
+      toast.warning(
+        "Este perfil no tiene instrucciones de prompts de imagen; se usarán las genéricas.",
+      );
+    }
+
+    clearError();
 
     try {
-      const response = await fetch("/api/image-prompts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          script: lastAssistantText,
-          provider,
-          model,
-          profileId: profileId || null,
-        }),
-      });
-
-      const raw = await response.text();
-
-      let data: { imagePrompts?: ImagePrompt[]; error?: string } = {};
-      try {
-        data = JSON.parse(raw) as typeof data;
-      } catch {
-        // La respuesta no era JSON (por ejemplo un error de plataforma).
-      }
-
-      if (!response.ok || !data.imagePrompts) {
-        throw new Error(
-          data.error ??
-            (raw.trim().slice(0, 200) || `El servidor devolvió un error (${response.status}).`),
-        );
-      }
-      setImagePrompts(data.imagePrompts);
-      setPromptsSource(lastAssistantText);
-      toast.success(`${data.imagePrompts.length} prompts generados.`);
-    } catch (promptError) {
+      await sendMessage(
+        {
+          text: "Genera los prompts de imagen para el guion anterior, siguiendo las instrucciones de prompts de imagen del perfil.",
+        },
+        {
+          body: {
+            conversationId: conversation.id,
+            profileId: profileId || null,
+            provider,
+            model,
+            mode: "image-prompts",
+          },
+        },
+      );
+    } catch (sendError) {
       toast.error(
-        promptError instanceof Error ? promptError.message : "Error al generar los prompts.",
+        sendError instanceof Error
+          ? sendError.message
+          : "No se pudieron generar los prompts.",
       );
     } finally {
-      setIsGeneratingPrompts(false);
+      router.refresh();
     }
   }
 
@@ -229,7 +209,7 @@ export function ChatWorkspace({
         profileId: profileId || null,
         title: conversation.title || "Guion sin título",
         content: lastAssistantText,
-        imagePrompts: visiblePrompts,
+        imagePrompts: [],
       });
 
       if (result.error) {
@@ -237,14 +217,12 @@ export function ChatWorkspace({
         return;
       }
 
-      toast.success("Guion guardado en el historial.");
+      toast.success("Última respuesta guardada en el historial.");
       router.refresh();
     } finally {
       setIsSavingScript(false);
     }
   }
-
-  const allPrompts = visiblePrompts.map((item) => item.prompt).join("\n\n");
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -395,8 +373,8 @@ export function ChatWorkspace({
               Prompts de imagen
             </CardTitle>
             <CardDescription>
-              Se generan a partir del último guion usando las instrucciones de prompts de imagen
-              del perfil activo.
+              Se generan como un mensaje más del chat, usando las instrucciones de prompts de
+              imagen del perfil activo.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -408,67 +386,29 @@ export function ChatWorkspace({
               </p>
             ) : null}
 
-            <div className="flex flex-col gap-2">
-              <Button
-                variant="secondary"
-                onClick={handleGeneratePrompts}
-                disabled={isGeneratingPrompts || !lastAssistantText || isBusy}
-              >
-                {isGeneratingPrompts ? (
-                  <Loader2Icon className="animate-spin" />
-                ) : (
-                  <SparklesIcon />
-                )}
-                Generar prompts
-              </Button>
+            <Button
+              variant="secondary"
+              onClick={handleGenerateImagePrompts}
+              disabled={isBusy || !lastAssistantText}
+            >
+              {isBusy ? <Loader2Icon className="animate-spin" /> : <SparklesIcon />}
+              Generar prompts de imagen
+            </Button>
 
-              <Button
-                variant="outline"
-                onClick={handleSaveScript}
-                disabled={isSavingScript || !lastAssistantText}
-              >
-                {isSavingScript ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
-                Guardar guion
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={handleSaveScript}
+              disabled={isSavingScript || !lastAssistantText}
+            >
+              {isSavingScript ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
+              Guardar respuesta en historial
+            </Button>
+
+            <p className="text-xs text-muted-foreground">
+              Los prompts aparecerán como un mensaje del asistente; puedes copiarlos desde ahí.
+            </p>
           </CardContent>
         </Card>
-
-        {visiblePrompts.length > 0 ? (
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle className="text-sm">Prompts generados</CardTitle>
-              <Button
-                variant="outline"
-                size="xs"
-                onClick={() => copyToClipboard(allPrompts, "Todos los prompts")}
-              >
-                <CopyIcon />
-                Copiar todos
-              </Button>
-            </CardHeader>
-            <CardContent className="flex max-h-[45vh] flex-col gap-3 overflow-y-auto">
-              {visiblePrompts.map((item) => (
-                <div key={item.index} className="flex flex-col gap-1.5 rounded-lg bg-muted p-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium">
-                      {item.index}. {item.scene}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => copyToClipboard(item.prompt, `Prompt ${item.index}`)}
-                      aria-label={`Copiar prompt ${item.index}`}
-                    >
-                      <CopyIcon />
-                    </Button>
-                  </div>
-                  <p className="text-xs whitespace-pre-wrap text-muted-foreground">{item.prompt}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ) : null}
       </aside>
     </div>
   );

@@ -27,6 +27,7 @@ const bodySchema = z.object({
   profileId: z.string().uuid().nullable().optional(),
   provider: z.string(),
   model: z.string(),
+  mode: z.enum(["chat", "image-prompts"]).optional(),
 });
 
 const BASE_INSTRUCTIONS = `Eres un guionista experto en contenido para redes sociales.
@@ -35,9 +36,41 @@ Cuando el usuario pida un guion, entrégalo completo y listo para grabar, con es
 (por ejemplo: gancho, desarrollo, cierre y llamada a la acción) y sin explicaciones innecesarias.
 Si el usuario solo conversa o pregunta algo, responde de forma breve y directa.`;
 
+const BASE_IMAGE_INSTRUCTIONS = `Eres un director de arte especializado en imágenes para redes sociales.
+A partir del guion de la conversación, escribes los prompts de imagen necesarios para ilustrarlo,
+en el mismo idioma del guion. Cada prompt debe ser una descripción visual autosuficiente, lista
+para pegar en un generador de imágenes, e incluir sujeto, acción, entorno, iluminación, encuadre y
+estilo. No incluyas texto, marcas de agua ni logotipos en la descripción.
+Responde con una lista numerada, un prompt por escena, con este formato:
+
+**Escena 1 — <título breve>**
+<prompt de imagen>
+
+**Escena 2 — <título breve>**
+<prompt de imagen>
+
+Sé conciso: una o dos frases por prompt, sin repetir información entre escenas.`;
+
 const BASE_THEMES = `## Recomendación de temas
 Propón temas concretos, originales y con potencial de alcance. Para cada tema indica en una línea
 el ángulo o enfoque que lo hace interesante.`;
+
+/** Instrucciones para generar los prompts de imagen del guion. */
+function buildImageInstructions(profile: Profile | null) {
+  const blocks: string[] = [BASE_IMAGE_INSTRUCTIONS];
+
+  if (profile?.image_prompt_instructions) {
+    blocks.push(
+      `## Instrucciones de estilo del perfil (prioritarias)\n${profile.image_prompt_instructions}`,
+    );
+  } else {
+    blocks.push(
+      "No hay instrucciones de prompts de imagen en el perfil: usa un estilo cinematográfico realista y genera entre 3 y 6 escenas.",
+    );
+  }
+
+  return blocks.join("\n\n");
+}
 
 function buildInstructions(profile: Profile | null) {
   const blocks: string[] = [BASE_INSTRUCTIONS];
@@ -155,7 +188,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
 
-  const { conversationId, profileId, provider, model } = parsed.data;
+  const { conversationId, profileId, provider, model, mode } = parsed.data;
 
   if (!isProviderId(provider)) {
     return NextResponse.json({ error: "Proveedor inválido." }, { status: 400 });
@@ -173,7 +206,8 @@ export async function POST(request: Request) {
 
     const result = streamText({
       model: languageModel,
-      instructions: buildInstructions(profile),
+      instructions:
+        mode === "image-prompts" ? buildImageInstructions(profile) : buildInstructions(profile),
       messages: await convertToModelMessages(messages),
     });
 

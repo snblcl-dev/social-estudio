@@ -71,8 +71,10 @@ para guardar tu primera API key.
 2. **Perfiles** → crea perfiles con sus instrucciones: estilo de guion, temas y **prompts de
    imagen** (aquí defines, por ejemplo, cuántas escenas quieres y el estilo visual).
 3. **Chat** → elige perfil, proveedor y modelo; pide un tema y el guion se genera en streaming.
-4. Pulsa **Generar prompts** para obtener los prompts de imagen del guion usando las
-   instrucciones del perfil activo, y **Guardar guion** para guardarlo en el **Historial**.
+4. Pulsa **Generar prompts de imagen** y los prompts aparecerán **como un mensaje más del chat**,
+   usando las instrucciones de prompts de imagen del perfil activo (número de escenas y estilo).
+   Puedes copiarlos desde el propio mensaje.
+5. **Guardar respuesta en historial** guarda el último mensaje del asistente en el **Historial**.
 
 ## Migraciones de base de datos
 
@@ -102,8 +104,8 @@ Migraciones disponibles:
 src/
   app/
     (app)/              # Chat, Perfiles, Ajustes, Historial (rutas protegidas)
-    api/chat/           # Streaming de chat (AI SDK)
-    api/image-prompts/  # Generación de prompts de imagen
+    api/chat/           # Streaming de chat y prompts de imagen (AI SDK)
+    api/models/         # Listado de modelos por proveedor
     login/              # Inicio de sesión
     actions/            # Server Actions (CRUD y auth)
   lib/
