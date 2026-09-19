@@ -36,11 +36,13 @@ Cuando el usuario pida un guion, entrégalo completo y listo para grabar, con es
 (por ejemplo: gancho, desarrollo, cierre y llamada a la acción) y sin explicaciones innecesarias.
 Si el usuario solo conversa o pregunta algo, responde de forma breve y directa.`;
 
-const BASE_IMAGE_INSTRUCTIONS = `Eres un director de arte especializado en imágenes para redes sociales.
-A partir del guion de la conversación, escribes los prompts de imagen necesarios para ilustrarlo,
-en el mismo idioma del guion. Cada prompt debe ser una descripción visual autosuficiente, lista
-para pegar en un generador de imágenes, e incluir sujeto, acción, entorno, iluminación, encuadre y
-estilo. No incluyas texto, marcas de agua ni logotipos en la descripción.
+const BASE_IMAGE_INSTRUCTIONS = `## Prompts de imagen
+Cuando el usuario pida los prompts de imagen (o prompts para ilustrar el guion), actúa como un
+director de arte especializado en imágenes para redes sociales. A partir del guion de la
+conversación, escribe los prompts de imagen necesarios para ilustrarlo, en el mismo idioma del
+guion. Cada prompt debe ser una descripción visual autosuficiente, lista para pegar en un
+generador de imágenes, e incluir sujeto, acción, entorno, iluminación, encuadre y estilo.
+No incluyas texto, marcas de agua ni logotipos en la descripción.
 Responde con una lista numerada, un prompt por escena, con este formato:
 
 **Escena 1 — <título breve>**
@@ -54,23 +56,6 @@ Sé conciso: una o dos frases por prompt, sin repetir información entre escenas
 const BASE_THEMES = `## Recomendación de temas
 Propón temas concretos, originales y con potencial de alcance. Para cada tema indica en una línea
 el ángulo o enfoque que lo hace interesante.`;
-
-/** Instrucciones para generar los prompts de imagen del guion. */
-function buildImageInstructions(profile: Profile | null) {
-  const blocks: string[] = [BASE_IMAGE_INSTRUCTIONS];
-
-  if (profile?.image_prompt_instructions) {
-    blocks.push(
-      `## Instrucciones de estilo del perfil (prioritarias)\n${profile.image_prompt_instructions}`,
-    );
-  } else {
-    blocks.push(
-      "No hay instrucciones de prompts de imagen en el perfil: usa un estilo cinematográfico realista y genera entre 3 y 6 escenas.",
-    );
-  }
-
-  return blocks.join("\n\n");
-}
 
 function buildInstructions(profile: Profile | null) {
   const blocks: string[] = [BASE_INSTRUCTIONS];
@@ -92,6 +77,20 @@ function buildInstructions(profile: Profile | null) {
     blocks.push(`## Instrucciones sobre los temas\n${profile.theme_instructions}`);
   } else {
     blocks.push(BASE_THEMES);
+  }
+
+  // Las instrucciones de prompts de imagen están siempre disponibles para que
+  // funcionen tanto si el usuario lo pide en el chat como si usa el botón.
+  blocks.push(BASE_IMAGE_INSTRUCTIONS);
+
+  if (profile?.image_prompt_instructions) {
+    blocks.push(
+      `## Instrucciones de prompts de imagen del perfil (prioritarias)\n${profile.image_prompt_instructions}`,
+    );
+  } else {
+    blocks.push(
+      "No hay instrucciones de prompts de imagen en el perfil: usa un estilo cinematográfico realista y genera entre 3 y 6 escenas.",
+    );
   }
 
   return blocks.join("\n\n");
@@ -205,17 +204,16 @@ export async function POST(request: Request) {
     const languageModel = await resolveModelForUser(user.id, provider as ProviderId, model);
 
     if (mode === "image-prompts") {
-      console.log("[api/chat] generando prompts de imagen", {
+      console.log("[api/chat] petición de prompts de imagen", {
         profileId: profileId ?? null,
         perfilEncontrado: Boolean(profile),
-        caracteresInstrucciones: profile?.image_prompt_instructions?.trim().length ?? 0,
+        caracteresInstruccionesImagen: profile?.image_prompt_instructions?.trim().length ?? 0,
       });
     }
 
     const result = streamText({
       model: languageModel,
-      instructions:
-        mode === "image-prompts" ? buildImageInstructions(profile) : buildInstructions(profile),
+      instructions: buildInstructions(profile),
       messages: await convertToModelMessages(messages),
     });
 

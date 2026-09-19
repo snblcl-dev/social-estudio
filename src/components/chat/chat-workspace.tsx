@@ -162,18 +162,6 @@ export function ChatWorkspace({
       return;
     }
 
-    if (!activeProfile) {
-      toast.warning("No hay perfil seleccionado: se usarán instrucciones genéricas (3-6 escenas).");
-    } else if (!hasImageInstructions) {
-      toast.warning(
-        `El perfil «${activeProfile.name}» no tiene instrucciones de prompts de imagen. Añádelas en Perfiles.`,
-      );
-    } else {
-      toast.info(
-        `Generando con las instrucciones del perfil «${activeProfile.name}» (${activeProfile.image_prompt_instructions.trim().length} caracteres).`,
-      );
-    }
-
     clearError();
 
     try {
@@ -380,8 +368,8 @@ export function ChatWorkspace({
               Prompts de imagen
             </CardTitle>
             <CardDescription>
-              Se generan como un mensaje más del chat, usando las instrucciones de prompts de
-              imagen del perfil activo.
+              Las instrucciones de prompts de imagen del perfil activo se aplican siempre, tanto
+              si las pides escribiendo en el chat como con el botón.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
@@ -413,7 +401,7 @@ export function ChatWorkspace({
               disabled={isBusy || !lastAssistantText}
             >
               {isBusy ? <Loader2Icon className="animate-spin" /> : <SparklesIcon />}
-              Generar prompts de imagen
+              Pedir prompts de imagen
             </Button>
 
             <Button
