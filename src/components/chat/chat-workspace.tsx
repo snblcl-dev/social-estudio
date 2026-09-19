@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ImageIcon,
   Loader2Icon,
@@ -161,9 +162,15 @@ export function ChatWorkspace({
       return;
     }
 
-    if (!hasImageInstructions) {
+    if (!activeProfile) {
+      toast.warning("No hay perfil seleccionado: se usarán instrucciones genéricas (3-6 escenas).");
+    } else if (!hasImageInstructions) {
       toast.warning(
-        "Este perfil no tiene instrucciones de prompts de imagen; se usarán las genéricas.",
+        `El perfil «${activeProfile.name}» no tiene instrucciones de prompts de imagen. Añádelas en Perfiles.`,
+      );
+    } else {
+      toast.info(
+        `Generando con las instrucciones del perfil «${activeProfile.name}» (${activeProfile.image_prompt_instructions.trim().length} caracteres).`,
       );
     }
 
@@ -378,13 +385,27 @@ export function ChatWorkspace({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
-            {!hasImageInstructions ? (
-              <p className="text-xs text-amber-600 dark:text-amber-500">
-                {profileId
-                  ? "Este perfil no tiene instrucciones de prompts de imagen. Añádelas en Perfiles para controlar el número de escenas y el estilo."
-                  : "Elige un perfil (arriba) para usar sus instrucciones de prompts de imagen, o añádelas en Perfiles."}
-              </p>
-            ) : null}
+            <div className="rounded-lg bg-muted p-2.5 text-xs">
+              {activeProfile ? (
+                hasImageInstructions ? (
+                  <>
+                    <span className="font-medium">Perfil: {activeProfile.name}</span>
+                    <br />
+                    {activeProfile.image_prompt_instructions.trim().length} caracteres de
+                    instrucciones de imagen.
+                  </>
+                ) : (
+                  <span className="text-amber-600 dark:text-amber-500">
+                    El perfil «{activeProfile.name}» no tiene instrucciones de prompts de imagen.
+                    Añádelas en Perfiles.
+                  </span>
+                )
+              ) : (
+                <span className="text-amber-600 dark:text-amber-500">
+                  Sin perfil seleccionado: se usarán instrucciones genéricas (3-6 escenas).
+                </span>
+              )}
+            </div>
 
             <Button
               variant="secondary"
@@ -406,6 +427,11 @@ export function ChatWorkspace({
 
             <p className="text-xs text-muted-foreground">
               Los prompts aparecerán como un mensaje del asistente; puedes copiarlos desde ahí.
+              Gestiona las instrucciones en{" "}
+              <Link href="/perfiles" className="underline underline-offset-4">
+                Perfiles
+              </Link>
+              .
             </p>
           </CardContent>
         </Card>
