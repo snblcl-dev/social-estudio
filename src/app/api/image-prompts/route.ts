@@ -26,44 +26,125 @@ del guion. Cada prompt debe ser una descripción visual autosuficiente, lista pa
 generador de imágenes, e incluir sujeto, acción, entorno, iluminación, encuadre y estilo.
 Sé conciso: una o dos frases por prompt, sin repetir información entre prompts.
 No incluyas texto, marcas de agua ni logotipos en la descripción.
-Responde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni bloques de código, con esta
-forma exacta: ${JSON_FORMAT}`;
 
-const outputSchema = z.object({
-  prompts: z
-    .array(
-      z.object({
-        scene: z.string().describe("Qué parte del guion ilustra esta imagen."),
-        prompt: z.string().describe("El prompt de imagen listo para usar."),
-      }),
-    )
-    .describe("Un prompt por cada plano o escena relevante del guion."),
-});
+FORMATO DE SALIDA OBLIGATORIO: responde ÚNICAMENTE con un objeto JSON válido, sin explicaciones,
+sin markdown y sin bloques de código. Ejemplo exacto de la forma requerida:
+${JSON_FORMAT}`;
 
-/**
- * Extrae el JSON de la respuesta del modelo aunque venga envuelto en texto o
- * en un bloque de código markdown.
- */
-function extractPrompts(rawText: string) {
-  const fenced = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced ? fenced[1] : rawText;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
+const SCENE_KEYS = [
+  "scene",
+  "escena",
+  "title",
+  "titulo",
+  "name",
+  "nombre",
+  "encuadre",
+  "plano",
+];
 
-  if (start === -1 || end <= start) return null;
+const PROMPT_KEYS = [
+  "prompt",
+  "image_prompt",
+  "imagePrompt",
+  "prompt_imagen",
+  "promptImagen",
+  "text",
+  "texto",
+  "descripcion",
+  "description",
+];
+
+function pickString(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function coerceItem(item: unknown, index: number) {
+  if (typeof item === "string") {
+    const text = item.trim();
+    return text ? { scene: `Escena ${index + 1}`, prompt: text } : null;
+  }
+
+  if (!item || typeof item !== "object") return null;
+
+  const source = item as Record<string, unknown>;
+  const prompt = pickString(source, PROMPT_KEYS);
+  if (!prompt) return null;
+
+  const scene = pickString(source, SCENE_KEYS) ?? `Escena ${index + 1}`;
+  return { scene, prompt };
+}
+
+/** Busca el primer array dentro de la estructura JSON, sea cual sea la clave. */
+function findPromptArray(value: unknown, depth = 0): unknown[] | null {
+  if (depth > 4) return null;
+  if (Array.isArray(value)) return value;
+
+  if (value && typeof value === "object") {
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      const found = findPromptArray((value as Record<string, unknown>)[key], depth + 1);
+      if (found) return found;
+    }
+  }
+
+  return null;
+}
+
+/** Intenta parsear JSON tolerando texto alrededor, bloques de código y NDJSON. */
+function parseJsonLoose(rawText: string): unknown | null {
+  const cleaned = rawText.replace(/```(?:json)?/gi, "").trim();
+  const firstBracket = cleaned.search(/[[{]/);
+  if (firstBracket === -1) return null;
+
+  const candidate = cleaned.slice(firstBracket);
+  const lastClose = Math.max(candidate.lastIndexOf("}"), candidate.lastIndexOf("]"));
+  if (lastClose === -1) return null;
+
+  const sliced = candidate.slice(0, lastClose + 1);
 
   try {
-    const parsed = outputSchema.safeParse(JSON.parse(candidate.slice(start, end + 1)));
-    return parsed.success ? parsed.data : null;
+    return JSON.parse(sliced);
   } catch {
-    return null;
+    // Respaldo: varios objetos JSON, uno por línea.
+    const items: unknown[] = [];
+    for (const line of sliced.split(/\r?\n/)) {
+      const trimmed = line.trim().replace(/,$/, "");
+      if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) continue;
+      try {
+        items.push(JSON.parse(trimmed));
+      } catch {
+        // Se ignora la línea que no sea JSON.
+      }
+    }
+    return items.length > 0 ? items : null;
   }
+}
+
+/**
+ * Extrae los prompts de la respuesta del modelo con tolerancia: acepta
+ * `{prompts:[...]}`, un array directo, claves en español, bloques de código, etc.
+ */
+function extractPrompts(rawText: string) {
+  const parsed = parseJsonLoose(rawText);
+  if (parsed === null) return null;
+
+  const array = findPromptArray(parsed);
+  if (!array) return null;
+
+  const prompts = array
+    .map((item, index) => coerceItem(item, index))
+    .filter((item): item is { scene: string; prompt: string } => item !== null);
+
+  return prompts.length > 0 ? { prompts } : null;
 }
 
 /**
  * No todos los proveedores/gateways respetan el "structured output" nativo
  * (por ejemplo Claude a través de AIRAI devolvía prosa). Por eso pedimos JSON
- * en el propio prompt y lo parseamos.
+ * en el propio prompt y lo parseamos de forma tolerante.
  *
  * Se limita el tiempo y los tokens para no superar el límite de duración de la
  * función en Vercel (FUNCTION_INVOCATION_TIMEOUT).
@@ -79,7 +160,7 @@ async function generateImagePrompts(
     model: languageModel,
     instructions,
     prompt,
-    maxOutputTokens: 3000,
+    maxOutputTokens: 6000,
     maxRetries: 1,
     abortSignal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
   });
@@ -87,8 +168,16 @@ async function generateImagePrompts(
   const parsed = extractPrompts(result.text);
 
   if (!parsed) {
+    const excerpt = result.text.replace(/\s+/g, " ").trim().slice(0, 160);
+    console.error("[api/image-prompts] respuesta no parseable:", {
+      text: result.text.slice(0, 2000),
+      finishReason: result.finishReason,
+    });
+
     throw new Error(
-      "El modelo no devolvió un JSON válido con los prompts. Prueba con otro modelo (por ejemplo deepseek-v4-flash).",
+      excerpt
+        ? `El modelo no devolvió prompts en JSON válido. Respuesta recibida: "${excerpt}"`
+        : "El modelo no devolvió texto (puede que haya agotado el límite de tokens). Prueba con otro modelo o menos escenas.",
     );
   }
 
