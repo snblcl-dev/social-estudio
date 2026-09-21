@@ -1,9 +1,11 @@
 import "server-only";
 
 import { decryptSecret } from "@/lib/crypto";
+import { listCustomModelsForProvider } from "@/lib/data/custom-providers";
 import { getApiKeyRow } from "@/lib/data/settings";
-import { PROVIDERS } from "@/lib/providers";
-import type { ProviderId } from "@/lib/types";
+import { normalizeBaseUrl } from "@/lib/providers";
+import { resolveProvider, type ResolvedProvider } from "@/lib/providers-server";
+import type { ProviderKey } from "@/lib/types";
 
 const EXCLUDED_PATTERNS = [
   /embedding/i,
@@ -74,6 +76,18 @@ function extractIds(json: Record<string, unknown>, key: "data" | "models") {
   );
 }
 
+/** Devuelve la clave descifrada o `null` si el proveedor no tiene una guardada. */
+async function getOptionalApiKey(userId: string, provider: ProviderKey) {
+  const row = await getApiKeyRow(userId, provider);
+  return row ? decryptSecret(row.encrypted_key) : null;
+}
+
+async function requireApiKey(userId: string, provider: ProviderKey) {
+  const apiKey = await getOptionalApiKey(userId, provider);
+  if (!apiKey) throw new Error("No hay una API key guardada para este proveedor.");
+  return apiKey;
+}
+
 async function listOpenAIModels(apiKey: string) {
   return extractIds(
     await fetchWithKey("https://api.openai.com/v1/models", apiKey),
@@ -102,49 +116,58 @@ async function listGoogleModels(apiKey: string) {
   return extractIds(json, "models");
 }
 
-async function requireApiKey(userId: string, provider: ProviderId) {
-  const row = await getApiKeyRow(userId, provider);
-
-  if (!row) {
-    throw new Error(`No hay una API key guardada para este proveedor.`);
-  }
-
-  return decryptSecret(row.encrypted_key);
-}
-
-export async function listModelsForProvider(userId: string, provider: ProviderId) {
-  const info = PROVIDERS[provider];
-
+/** Consulta al proveedor si expone un endpoint de modelos. */
+async function fetchRemoteModels(
+  userId: string,
+  provider: ProviderKey,
+  resolved: ResolvedProvider,
+): Promise<string[]> {
   // Proveedores compatibles con la API de OpenAI (gateways personalizados).
-  if (info.openaiCompatible && info.baseURL) {
-    const apiKey = await requireApiKey(userId, provider);
-    return extractIds(await fetchWithKey(`${info.baseURL}/models`, apiKey), "data");
+  if (resolved.openaiCompatible && resolved.baseURL) {
+    const apiKey = (await getOptionalApiKey(userId, provider)) ?? "not-needed";
+    return extractIds(
+      await fetchWithKey(`${normalizeBaseUrl(resolved.baseURL)}/models`, apiKey),
+      "data",
+    );
   }
 
   switch (provider) {
     case "anthropic":
       // Anthropic no expone un endpoint público para listar modelos.
-      return [] as string[];
+      return [];
 
     case "openai":
     case "deepseek":
     case "openrouter":
     case "google": {
       const apiKey = await requireApiKey(userId, provider);
-
       if (provider === "openai") return listOpenAIModels(apiKey);
       if (provider === "deepseek") return listDeepSeekModels(apiKey);
       if (provider === "openrouter") return listOpenRouterModels(apiKey);
       return listGoogleModels(apiKey);
     }
 
-    case "airai":
-      // Se resuelve en la rama OpenAI-compatible de arriba.
-      throw new Error("El proveedor AIRAI requiere baseURL en la configuración.");
-
-    default: {
-      const exhaustive: never = provider;
-      throw new Error(`Proveedor no soportado: ${exhaustive}`);
-    }
+    default:
+      return [];
   }
+}
+
+/**
+ * Combina los modelos manuales del usuario con los que devuelve el proveedor.
+ * Si la consulta automática falla, igualmente devuelve los modelos manuales.
+ */
+export async function listModelsForProvider(userId: string, provider: ProviderKey) {
+  const resolved = await resolveProvider(userId, provider);
+  if (!resolved) throw new Error("El proveedor no existe o fue eliminado.");
+
+  const manual = await listCustomModelsForProvider(userId, provider);
+
+  let remote: string[] = [];
+  try {
+    remote = await fetchRemoteModels(userId, provider, resolved);
+  } catch {
+    // El listado automático no está disponible: nos quedamos con los manuales.
+  }
+
+  return cleanModelIds([...manual, ...remote]);
 }

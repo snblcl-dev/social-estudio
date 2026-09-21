@@ -24,13 +24,13 @@ import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { PROVIDERS } from "@/lib/providers";
-import type { Conversation, Profile, ProviderId } from "@/lib/types";
+import type { Conversation, Profile, ProviderKey, ProviderOption } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ChatWorkspaceProps {
   conversation: Conversation;
   profiles: Profile[];
+  providerOptions: ProviderOption[];
   initialMessages: UIMessage[];
 }
 
@@ -44,14 +44,17 @@ function textOf(message: UIMessage) {
 export function ChatWorkspace({
   conversation,
   profiles,
+  providerOptions,
   initialMessages,
 }: ChatWorkspaceProps) {
   const router = useRouter();
   const [initial] = useState(initialMessages);
   const [input, setInput] = useState("");
-  const [provider, setProvider] = useState<ProviderId>(conversation.provider);
+  const [provider, setProvider] = useState<ProviderKey>(conversation.provider);
   const [model, setModel] = useState(
-    conversation.model || PROVIDERS[conversation.provider].defaultModel,
+    conversation.model ||
+      providerOptions.find((option) => option.key === conversation.provider)?.defaultModel ||
+      "",
   );
   const [profileId, setProfileId] = useState(conversation.profile_id ?? "");
   const [isSavingScript, setIsSavingScript] = useState(false);
@@ -175,9 +178,9 @@ export function ChatWorkspace({
     }
   }
 
-  function handleProviderChange(next: ProviderId) {
+  function handleProviderChange(next: ProviderKey) {
     setProvider(next);
-    setModel(PROVIDERS[next].defaultModel);
+    setModel(providerOptions.find((option) => option.key === next)?.defaultModel ?? "");
   }
 
   async function handleGenerateImagePrompts() {
@@ -429,12 +432,12 @@ export function ChatWorkspace({
                       value={provider}
                       className="w-full"
                       onChange={(event) =>
-                        handleProviderChange(event.target.value as ProviderId)
+                        handleProviderChange(event.target.value as ProviderKey)
                       }
                     >
-                      {Object.values(PROVIDERS).map((info) => (
-                        <option key={info.id} value={info.id}>
-                          {info.label}
+                      {providerOptions.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.custom ? `${option.label} (personalizado)` : option.label}
                         </option>
                       ))}
                     </NativeSelect>
@@ -444,7 +447,19 @@ export function ChatWorkspace({
                     <Label htmlFor="chat-model" className="text-xs text-muted-foreground">
                       Modelo
                     </Label>
-                    <ModelSelect provider={provider} value={model} onChange={setModel} />
+                    <ModelSelect
+                      provider={provider}
+                      value={model}
+                      onChange={setModel}
+                      fallbackModels={
+                        providerOptions.find((option) => option.key === provider)
+                          ?.suggestedModels ?? []
+                      }
+                      placeholder={
+                        providerOptions.find((option) => option.key === provider)
+                          ?.defaultModel ?? ""
+                      }
+                    />
                   </div>
 
                   <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/50 px-2.5 py-2 text-xs">

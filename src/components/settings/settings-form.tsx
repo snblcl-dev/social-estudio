@@ -12,21 +12,23 @@ import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { PROVIDERS, PROVIDER_IDS } from "@/lib/providers";
-import type { ProviderId } from "@/lib/types";
+import type { ProviderKey, ProviderOption } from "@/lib/types";
 
 interface SettingsFormProps {
   initial: {
-    default_provider: ProviderId;
+    default_provider: ProviderKey;
     default_model: string;
   };
+  providerOptions: ProviderOption[];
 }
 
-export function SettingsForm({ initial }: SettingsFormProps) {
+export function SettingsForm({ initial, providerOptions }: SettingsFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [provider, setProvider] = useState<ProviderId>(initial.default_provider);
+  const [provider, setProvider] = useState<ProviderKey>(initial.default_provider);
   const [model, setModel] = useState(initial.default_model);
+
+  const current = providerOptions.find((option) => option.key === provider);
 
   function handleSave() {
     startTransition(async () => {
@@ -62,14 +64,16 @@ export function SettingsForm({ initial }: SettingsFormProps) {
               id="default-provider"
               value={provider}
               onChange={(event) => {
-                const next = event.target.value as ProviderId;
+                const next = event.target.value as ProviderKey;
                 setProvider(next);
-                setModel(PROVIDERS[next].defaultModel);
+                setModel(
+                  providerOptions.find((option) => option.key === next)?.defaultModel ?? "",
+                );
               }}
             >
-              {PROVIDER_IDS.map((id) => (
-                <option key={id} value={id}>
-                  {PROVIDERS[id].label}
+              {providerOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.custom ? `${option.label} (personalizado)` : option.label}
                 </option>
               ))}
             </NativeSelect>
@@ -77,7 +81,13 @@ export function SettingsForm({ initial }: SettingsFormProps) {
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="default-model">Modelo por defecto</Label>
-            <ModelSelect provider={provider} value={model} onChange={setModel} />
+            <ModelSelect
+              provider={provider}
+              value={model}
+              onChange={setModel}
+              fallbackModels={current?.suggestedModels ?? []}
+              placeholder={current?.defaultModel ?? ""}
+            />
           </div>
         </div>
 

@@ -93,6 +93,38 @@ create table if not exists public.scripts (
 create index if not exists scripts_user_idx on public.scripts (user_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
+-- CUSTOM_PROVIDERS: endpoints propios compatibles con la API de OpenAI.
+-- Se referencian como "custom:<uuid>" en api_keys.provider,
+-- conversations.provider, settings.default_provider y custom_models.provider.
+-- ---------------------------------------------------------------------------
+create table if not exists public.custom_providers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  name text not null,
+  base_url text not null,
+  default_model text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+create index if not exists custom_providers_user_idx on public.custom_providers (user_id);
+
+-- ---------------------------------------------------------------------------
+-- CUSTOM_MODELS: modelos añadidos a mano a cualquier proveedor
+-- ---------------------------------------------------------------------------
+create table if not exists public.custom_models (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  provider text not null,
+  model text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, provider, model)
+);
+
+create index if not exists custom_models_user_idx on public.custom_models (user_id, provider);
+
+-- ---------------------------------------------------------------------------
 -- Trigger para mantener updated_at al día
 -- ---------------------------------------------------------------------------
 create or replace function public.set_updated_at()
@@ -115,6 +147,11 @@ create trigger conversations_set_updated_at
   before update on public.conversations
   for each row execute function public.set_updated_at();
 
+drop trigger if exists custom_providers_set_updated_at on public.custom_providers;
+create trigger custom_providers_set_updated_at
+  before update on public.custom_providers
+  for each row execute function public.set_updated_at();
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security: cada usuario solo ve sus propias filas
 -- ---------------------------------------------------------------------------
@@ -124,6 +161,8 @@ alter table public.api_keys enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 alter table public.scripts enable row level security;
+alter table public.custom_providers enable row level security;
+alter table public.custom_models enable row level security;
 
 drop policy if exists "profiles_owner" on public.profiles;
 create policy "profiles_owner" on public.profiles
@@ -157,6 +196,18 @@ create policy "messages_owner" on public.messages
 
 drop policy if exists "scripts_owner" on public.scripts;
 create policy "scripts_owner" on public.scripts
+  for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "custom_providers_owner" on public.custom_providers;
+create policy "custom_providers_owner" on public.custom_providers
+  for all to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "custom_models_owner" on public.custom_models;
+create policy "custom_models_owner" on public.custom_models
   for all to authenticated
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);

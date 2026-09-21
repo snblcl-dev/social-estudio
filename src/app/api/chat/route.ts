@@ -12,9 +12,9 @@ import { z } from "zod";
 
 import { MissingApiKeyError, resolveModelForUser } from "@/lib/ai/model";
 import { getProfile } from "@/lib/data/profiles";
-import { isProviderId } from "@/lib/providers";
+import { isProviderKey } from "@/lib/providers";
 import { createClient, createClientWithToken } from "@/lib/supabase/server";
-import type { Profile, ProviderId } from "@/lib/types";
+import type { Profile, ProviderKey } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
 
   const { conversationId, profileId, provider, model, mode } = parsed.data;
 
-  if (!isProviderId(provider)) {
+  if (!isProviderKey(provider)) {
     return NextResponse.json({ error: "Proveedor inválido." }, { status: 400 });
   }
 
@@ -201,7 +201,7 @@ export async function POST(request: Request) {
 
   try {
     const profile = profileId ? await getProfile(user.id, profileId) : null;
-    const languageModel = await resolveModelForUser(user.id, provider as ProviderId, model);
+    const languageModel = await resolveModelForUser(user.id, provider as ProviderKey, model);
 
     if (mode === "image-prompts") {
       console.log("[api/chat] petición de prompts de imagen", {

@@ -2,7 +2,7 @@ import "server-only";
 
 import { decryptSecret, maskSecret } from "@/lib/crypto";
 import { createClient } from "@/lib/supabase/server";
-import type { ApiKeyRow, ApiKeySummary, ProviderId, UserSettings } from "@/lib/types";
+import type { ApiKeyRow, ApiKeySummary, ProviderKey, UserSettings } from "@/lib/types";
 
 export async function getSettings(userId: string): Promise<UserSettings> {
   const supabase = await createClient();
@@ -27,7 +27,7 @@ export async function getSettings(userId: string): Promise<UserSettings> {
 
 export async function getApiKeyRow(
   userId: string,
-  provider: ProviderId,
+  provider: ProviderKey,
 ): Promise<ApiKeyRow | null> {
   const supabase = await createClient();
 
@@ -53,7 +53,7 @@ export async function listApiKeyRows(userId: string): Promise<ApiKeyRow[]> {
   return (data as ApiKeyRow[] | null) ?? [];
 }
 
-export async function listConfiguredProviders(userId: string): Promise<ProviderId[]> {
+export async function listConfiguredProviders(userId: string): Promise<ProviderKey[]> {
   const rows = await listApiKeyRows(userId);
   return rows.map((row) => row.provider);
 }

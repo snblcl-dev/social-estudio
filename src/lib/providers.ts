@@ -1,4 +1,9 @@
-import type { ProviderId, ProviderInfo } from "@/lib/types";
+import type {
+  CustomProviderKey,
+  ProviderId,
+  ProviderInfo,
+  ProviderKey,
+} from "@/lib/types";
 
 export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   openai: {
@@ -66,17 +71,54 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
 
 export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[];
 
+export const CUSTOM_PROVIDER_PREFIX = "custom:";
+
 export function isProviderId(value: string): value is ProviderId {
   return value in PROVIDERS;
+}
+
+/** `true` si la clave corresponde a un proveedor personalizado (`custom:<uuid>`). */
+export function isCustomProviderKey(value: string): value is CustomProviderKey {
+  return (
+    value.startsWith(CUSTOM_PROVIDER_PREFIX) &&
+    value.length > CUSTOM_PROVIDER_PREFIX.length
+  );
+}
+
+/** `true` si la clave identifica a un proveedor integrado o personalizado. */
+export function isProviderKey(value: string): value is ProviderKey {
+  return isProviderId(value) || isCustomProviderKey(value);
+}
+
+export function toCustomProviderKey(id: string): CustomProviderKey {
+  return `${CUSTOM_PROVIDER_PREFIX}${id}`;
+}
+
+/** Extrae el uuid de la fila `custom_providers` a partir de la clave. */
+export function customProviderId(key: string): string | null {
+  return isCustomProviderKey(key)
+    ? key.slice(CUSTOM_PROVIDER_PREFIX.length)
+    : null;
 }
 
 export function getProvider(provider: ProviderId) {
   return PROVIDERS[provider];
 }
 
+/** Quita espacios y barras finales de una URL base de proveedor. */
+export function normalizeBaseUrl(value: string) {
+  return value.trim().replace(/\/+$/, "");
+}
+
 const FALLBACK_MODEL = "gpt-4o-mini";
 
-export function normalizeModel(provider: ProviderId, model: string | null | undefined) {
+export function normalizeModel(
+  provider: ProviderKey,
+  model: string | null | undefined,
+  fallback = FALLBACK_MODEL,
+) {
   const trimmed = model?.trim();
-  return trimmed ? trimmed : (PROVIDERS[provider]?.defaultModel ?? FALLBACK_MODEL);
+  if (trimmed) return trimmed;
+  if (isProviderId(provider)) return PROVIDERS[provider].defaultModel;
+  return fallback;
 }

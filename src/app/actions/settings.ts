@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { encryptSecret } from "@/lib/crypto";
-import { isProviderId } from "@/lib/providers";
+import { isProviderKey } from "@/lib/providers";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 const settingsSchema = z.object({
@@ -36,7 +36,7 @@ export async function saveSettings(input: SettingsInput): Promise<ActionResult> 
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  if (!isProviderId(parsed.data.default_provider)) {
+  if (!isProviderKey(parsed.data.default_provider)) {
     return { error: "Proveedor por defecto inválido." };
   }
 
@@ -64,7 +64,7 @@ export async function saveApiKey(input: {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  if (!isProviderId(input.provider)) {
+  if (!isProviderKey(input.provider)) {
     return { error: "Proveedor inválido." };
   }
 
@@ -94,7 +94,7 @@ export async function deleteApiKey(provider: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  if (!isProviderId(provider)) {
+  if (!isProviderKey(provider)) {
     return { error: "Proveedor inválido." };
   }
 

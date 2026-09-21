@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getConversation, listMessages } from "@/lib/data/conversations";
 import { listProfiles } from "@/lib/data/profiles";
 import { getSettings, listConfiguredProviders } from "@/lib/data/settings";
-import { isProviderId } from "@/lib/providers";
+import { isProviderKey } from "@/lib/providers";
+import { listProviderOptions } from "@/lib/providers-server";
 import { getCurrentUser } from "@/lib/supabase/server";
-import type { ProviderId } from "@/lib/types";
+import type { ProviderKey } from "@/lib/types";
 
 export default async function ChatPage({
   searchParams,
@@ -23,13 +24,14 @@ export default async function ChatPage({
 
   const { c } = await searchParams;
 
-  const [profiles, settings, configuredProviders] = await Promise.all([
+  const [profiles, settings, configuredProviders, providerOptions] = await Promise.all([
     listProfiles(user.id),
     getSettings(user.id),
     listConfiguredProviders(user.id),
+    listProviderOptions(user.id),
   ]);
 
-  const defaultProvider: ProviderId = isProviderId(settings.default_provider)
+  const defaultProvider: ProviderKey = isProviderKey(settings.default_provider)
     ? settings.default_provider
     : (configuredProviders[0] ?? "openai");
 
@@ -63,6 +65,7 @@ export default async function ChatPage({
           <CardContent>
             <NewConversationForm
               profiles={profiles}
+              providerOptions={providerOptions}
               configuredProviders={configuredProviders}
               defaultProvider={defaultProvider}
               defaultModel={settings.default_model}
@@ -79,6 +82,7 @@ export default async function ChatPage({
         key={conversation.id}
         conversation={conversation}
         profiles={profiles}
+        providerOptions={providerOptions}
         initialMessages={initialMessages}
       />
     </div>

@@ -3,6 +3,7 @@
 Generador de guiones y prompts de imagen para redes sociales con IA.
 
 - **Chat** con streaming y selección de proveedor/modelo (OpenAI, Anthropic, Google/Gemini, DeepSeek, OpenRouter).
+- **Proveedores personalizados** compatibles con la API de OpenAI (URL base propia) y **modelos manuales** por si el listado automático no los devuelve.
 - **Perfiles** con instrucciones personalizadas de estilo de guion y de temas (ej. estilo bíblico).
 - **Prompts de imagen** generados a partir del guion usando tus instrucciones de estilo.
 - **Historial** de guiones guardados, con copiar/descargar.
@@ -67,7 +68,8 @@ para guardar tu primera API key.
 ## Uso
 
 1. **Ajustes** → pega tus API keys (OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter y AIRAI) y
-   elige el proveedor y modelo por defecto.
+   elige el proveedor y modelo por defecto. También puedes **agregar proveedores
+   personalizados** (cualquier endpoint compatible con OpenAI) y **modelos manuales**.
 2. **Perfiles** → crea perfiles con sus instrucciones: estilo de guion, temas y **prompts de
    imagen** (aquí defines, por ejemplo, cuántas escenas quieres y el estilo visual).
 3. **Chat** → elige perfil, proveedor y modelo; pide un tema y el guion se genera en streaming.
@@ -88,6 +90,8 @@ Migraciones disponibles:
   `settings` (global) a `profiles` (una por perfil) y conserva lo que ya tenías.
 - `0003_messages_position.sql` → añade una columna `position` a `messages` para garantizar el
   orden de los mensajes al recargar una conversación.
+- `0004_custom_providers.sql` → añade `custom_providers` (endpoints propios compatibles con
+  OpenAI) y `custom_models` (modelos agregados a mano).
 
 ## Despliegue en Vercel
 

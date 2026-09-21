@@ -9,24 +9,28 @@ import type { LanguageModel } from "ai";
 
 import { decryptSecret } from "@/lib/crypto";
 import { getApiKeyRow } from "@/lib/data/settings";
-import { normalizeModel, PROVIDERS } from "@/lib/providers";
-import type { ProviderId } from "@/lib/types";
+import { normalizeModel } from "@/lib/providers";
+import { resolveProvider, type ResolvedProvider } from "@/lib/providers-server";
+import type { ProviderKey } from "@/lib/types";
 
 export class MissingApiKeyError extends Error {
-  constructor(provider: ProviderId) {
-    super(`No hay una API key guardada para ${PROVIDERS[provider].label}. Añádela en Ajustes.`);
+  constructor(label: string) {
+    super(`No hay una API key guardada para ${label}. Añádela en Ajustes.`);
     this.name = "MissingApiKeyError";
   }
 }
 
 /** Construye una instancia de modelo del AI SDK para el proveedor indicado. */
-export function buildModel(provider: ProviderId, model: string, apiKey: string): LanguageModel {
-  const info = PROVIDERS[provider];
-
+export function buildModel(
+  provider: ProviderKey,
+  model: string,
+  apiKey: string,
+  baseURL?: string,
+): LanguageModel {
   // Proveedores compatibles con la API de OpenAI (gateways personalizados).
   // Se usa Chat Completions porque es lo que exponen estos servicios.
-  if (info.openaiCompatible && info.baseURL) {
-    return createOpenAI({ apiKey, baseURL: info.baseURL, name: info.id }).chat(model);
+  if (baseURL) {
+    return createOpenAI({ apiKey, baseURL, name: provider }).chat(model);
   }
 
   switch (provider) {
@@ -40,29 +44,46 @@ export function buildModel(provider: ProviderId, model: string, apiKey: string):
       return createDeepSeek({ apiKey })(model);
     case "openrouter":
       return createOpenRouter({ apiKey })(model);
-    case "airai":
-      // Se resuelve en la rama OpenAI-compatible de arriba.
-      throw new Error("El proveedor AIRAI requiere baseURL en la configuración.");
-    default: {
-      const exhaustive: never = provider;
-      throw new Error(`Proveedor no soportado: ${exhaustive}`);
-    }
+    default:
+      throw new Error(`Proveedor no soportado: ${provider}`);
   }
 }
 
 /** Resuelve el modelo a usar para un usuario, leyendo y descifrando su API key. */
 export async function resolveModelForUser(
   userId: string,
-  provider: ProviderId,
+  provider: ProviderKey,
   model: string | null | undefined,
 ): Promise<LanguageModel> {
-  const row = await getApiKeyRow(userId, provider);
+  const resolved = await resolveProvider(userId, provider);
 
-  if (!row) {
-    throw new MissingApiKeyError(provider);
+  if (!resolved) {
+    throw new Error("El proveedor seleccionado no existe o fue eliminado.");
   }
 
-  const apiKey = decryptSecret(row.encrypted_key);
+  const row = await getApiKeyRow(userId, provider);
 
-  return buildModel(provider, normalizeModel(provider, model), apiKey);
+  // Los endpoints personalizados pueden funcionar sin clave (por ejemplo, un
+  // servidor local). Si no hay clave guardada, enviamos un marcador.
+  if (resolved.custom && !row) {
+    return buildResolved(resolved, model, "not-needed");
+  }
+
+  if (!row) {
+    throw new MissingApiKeyError(resolved.label);
+  }
+
+  return buildResolved(resolved, model, decryptSecret(row.encrypted_key));
+}
+
+function buildResolved(
+  resolved: ResolvedProvider,
+  model: string | null | undefined,
+  apiKey: string,
+): LanguageModel {
+  const finalModel = normalizeModel(resolved.key, model, resolved.defaultModel);
+  if (!finalModel) {
+    throw new Error(`Selecciona un modelo para ${resolved.label}.`);
+  }
+  return buildModel(resolved.key, finalModel, apiKey, resolved.baseURL);
 }

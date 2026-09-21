@@ -11,18 +11,19 @@ import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { PROVIDERS } from "@/lib/providers";
-import type { Profile, ProviderId } from "@/lib/types";
+import type { Profile, ProviderKey, ProviderOption } from "@/lib/types";
 
 interface NewConversationFormProps {
   profiles: Profile[];
-  configuredProviders: ProviderId[];
-  defaultProvider: ProviderId;
+  providerOptions: ProviderOption[];
+  configuredProviders: ProviderKey[];
+  defaultProvider: ProviderKey;
   defaultModel: string;
 }
 
 export function NewConversationForm({
   profiles,
+  providerOptions,
   configuredProviders,
   defaultProvider,
   defaultModel,
@@ -30,24 +31,34 @@ export function NewConversationForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const availableProviders =
-    configuredProviders.length > 0 ? configuredProviders : ([defaultProvider] as ProviderId[]);
+  const configured = new Set(configuredProviders);
+  const availableOptions = providerOptions.filter(
+    (option) => option.custom || configured.has(option.key),
+  );
 
-  const initialProvider = availableProviders.includes(defaultProvider)
-    ? defaultProvider
-    : availableProviders[0];
+  const usableOptions =
+    availableOptions.length > 0
+      ? availableOptions
+      : providerOptions.filter((option) => option.key === defaultProvider);
 
-  const [provider, setProvider] = useState<ProviderId>(initialProvider);
+  const initialOption =
+    usableOptions.find((option) => option.key === defaultProvider) ??
+    usableOptions[0] ??
+    providerOptions[0];
+
+  const [provider, setProvider] = useState<ProviderKey>(initialOption.key);
   const [model, setModel] = useState(
-    defaultProvider === initialProvider && defaultModel
+    defaultProvider === initialOption.key && defaultModel
       ? defaultModel
-      : PROVIDERS[initialProvider].defaultModel,
+      : initialOption.defaultModel,
   );
   const [profileId, setProfileId] = useState<string>(profiles[0]?.id ?? "");
 
-  function handleProviderChange(next: ProviderId) {
+  const current = providerOptions.find((option) => option.key === provider);
+
+  function handleProviderChange(next: ProviderKey) {
     setProvider(next);
-    setModel(PROVIDERS[next].defaultModel);
+    setModel(providerOptions.find((option) => option.key === next)?.defaultModel ?? "");
   }
 
   function handleCreate() {
@@ -100,11 +111,11 @@ export function NewConversationForm({
           <NativeSelect
             id="new-provider"
             value={provider}
-            onChange={(event) => handleProviderChange(event.target.value as ProviderId)}
+            onChange={(event) => handleProviderChange(event.target.value as ProviderKey)}
           >
-            {availableProviders.map((id) => (
-              <option key={id} value={id}>
-                {PROVIDERS[id].label}
+            {usableOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.custom ? `${option.label} (personalizado)` : option.label}
               </option>
             ))}
           </NativeSelect>
@@ -112,11 +123,17 @@ export function NewConversationForm({
 
         <div className="flex flex-col gap-2">
           <Label htmlFor="new-model">Modelo</Label>
-          <ModelSelect provider={provider} value={model} onChange={setModel} />
+          <ModelSelect
+            provider={provider}
+            value={model}
+            onChange={setModel}
+            fallbackModels={current?.suggestedModels ?? []}
+            placeholder={current?.defaultModel ?? ""}
+          />
         </div>
       </div>
 
-      {configuredProviders.length === 0 ? (
+      {configuredProviders.length === 0 && availableOptions.length === 0 ? (
         <p className="text-xs text-amber-600 dark:text-amber-500">
           Aún no has guardado ninguna API key.{" "}
           <Link href="/ajustes" className="underline underline-offset-4">

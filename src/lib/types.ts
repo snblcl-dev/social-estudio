@@ -6,6 +6,16 @@ export type ProviderId =
   | "openrouter"
   | "airai";
 
+/**
+ * Proveedor personalizado creado por el usuario. Se identifica con el prefijo
+ * `custom:` seguido del uuid de la fila en `custom_providers`. Apunta a un
+ * endpoint compatible con la API de OpenAI.
+ */
+export type CustomProviderKey = `custom:${string}`;
+
+/** Identificador de cualquier proveedor: integrado o personalizado. */
+export type ProviderKey = ProviderId | CustomProviderKey;
+
 export interface ProviderInfo {
   id: ProviderId;
   label: string;
@@ -34,7 +44,7 @@ export interface Profile {
 
 export interface UserSettings {
   user_id: string;
-  default_provider: ProviderId;
+  default_provider: ProviderKey;
   default_model: string;
   updated_at: string;
 }
@@ -42,7 +52,7 @@ export interface UserSettings {
 export interface ApiKeyRow {
   id: string;
   user_id: string;
-  provider: ProviderId;
+  provider: ProviderKey;
   encrypted_key: string;
   created_at: string;
   updated_at: string;
@@ -53,7 +63,7 @@ export interface Conversation {
   user_id: string;
   profile_id: string | null;
   title: string;
-  provider: ProviderId;
+  provider: ProviderKey;
   model: string;
   created_at: string;
   updated_at: string;
@@ -87,7 +97,36 @@ export interface Script {
 }
 
 export interface ApiKeySummary {
-  provider: ProviderId;
+  provider: ProviderKey;
   masked: string;
   updated_at: string;
+}
+
+/** Fila de `custom_providers`: endpoint compatible con OpenAI definido por el usuario. */
+export interface CustomProvider {
+  id: string;
+  user_id: string;
+  name: string;
+  base_url: string;
+  default_model: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Fila de `custom_models`: modelo añadido a mano a cualquier proveedor. */
+export interface CustomModel {
+  id: string;
+  user_id: string;
+  provider: ProviderKey;
+  model: string;
+  created_at: string;
+}
+
+/** Proveedor listo para la interfaz: integrado o personalizado. */
+export interface ProviderOption {
+  key: ProviderKey;
+  label: string;
+  defaultModel: string;
+  suggestedModels: string[];
+  custom: boolean;
 }

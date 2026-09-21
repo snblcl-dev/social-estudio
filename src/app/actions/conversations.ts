@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { isProviderId } from "@/lib/providers";
+import { isProviderKey } from "@/lib/providers";
 import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 export interface ActionResult {
@@ -53,7 +53,7 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  if (!isProviderId(parsed.data.provider)) {
+  if (!isProviderKey(parsed.data.provider)) {
     return { error: "Proveedor inválido." };
   }
 
@@ -121,7 +121,7 @@ export async function createConversation(input: {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  if (!isProviderId(input.provider)) {
+  if (!isProviderKey(input.provider)) {
     return { error: "Proveedor inválido." };
   }
 
@@ -160,7 +160,7 @@ export async function updateConversation(input: {
   if (input.profileId !== undefined) updates.profile_id = input.profileId;
   if (input.model) updates.model = input.model;
   if (input.provider) {
-    if (!isProviderId(input.provider)) return { error: "Proveedor inválido." };
+    if (!isProviderKey(input.provider)) return { error: "Proveedor inválido." };
     updates.provider = input.provider;
   }
 
