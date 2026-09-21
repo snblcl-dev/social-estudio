@@ -23,20 +23,22 @@ export default async function SettingsPage() {
     : "openai";
 
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
-      <PageHeader
-        title="Ajustes"
-        description="Configura tus claves de IA y el modelo por defecto. Las instrucciones de prompts de imagen se definen en cada perfil."
-      />
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Ajustes"
+          description="Configura tus claves de IA y el modelo por defecto. Las instrucciones de prompts de imagen se definen en cada perfil."
+        />
 
-      <ApiKeysPanel keys={keys} />
+        <ApiKeysPanel keys={keys} />
 
-      <SettingsForm
-        initial={{
-          default_provider: defaultProvider,
-          default_model: settings.default_model,
-        }}
-      />
+        <SettingsForm
+          initial={{
+            default_provider: defaultProvider,
+            default_model: settings.default_model,
+          }}
+        />
+      </div>
     </div>
   );
 }
