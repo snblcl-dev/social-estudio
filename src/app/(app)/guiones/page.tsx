@@ -1,3 +1,4 @@
+import { NewScriptDialog } from "@/components/scripts/new-script-dialog";
 import { ScriptsList } from "@/components/scripts/scripts-list";
 import { PageHeader } from "@/components/page-header";
 import { listProfiles } from "@/lib/data/profiles";
@@ -22,7 +23,8 @@ export default async function ScriptsPage() {
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
       <PageHeader
         title="Guiones"
-        description="Guiones guardados, sus prompts de imagen y la voz generada."
+        description="Guiones guardados, sus prompts de imagen y la voz generada. También puedes crear uno manualmente."
+        actions={<NewScriptDialog />}
       />
 
       <ScriptsList scripts={scripts} profiles={profiles} hasVibiKey={Boolean(vibiKey)} />
