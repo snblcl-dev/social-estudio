@@ -122,6 +122,39 @@ export function vibiListModels(apiKey: string, provider: VibiProvider) {
   return vibiFetch<VibiModel[]>(`/v1/models?provider=${provider}`, apiKey);
 }
 
+const VOICE_PAGE_SIZE = 100;
+const MAX_VOICE_PAGES = 20;
+
+/**
+ * Recorre las páginas de un listado de voces paginado (`page`/`page_size`,
+ * `has_more`) hasta agotarlas o alcanzar el tope de seguridad.
+ */
+async function vibiListPagedVoices<TRaw>(
+  apiKey: string,
+  basePath: string,
+  search: string | undefined,
+  extract: (json: { voice_list?: TRaw[]; has_more?: boolean }) => TRaw[],
+): Promise<TRaw[]> {
+  const searchParam = search?.trim()
+    ? `&search=${encodeURIComponent(search.trim())}`
+    : "";
+  const all: TRaw[] = [];
+
+  for (let page = 1; page <= MAX_VOICE_PAGES; page += 1) {
+    const data = await vibiFetch<{ voice_list?: TRaw[]; has_more?: boolean }>(
+      `${basePath}?page=${page}&page_size=${VOICE_PAGE_SIZE}${searchParam}`,
+      apiKey,
+    );
+
+    const items = extract(data);
+    all.push(...items);
+
+    if (!data.has_more || items.length === 0) break;
+  }
+
+  return all;
+}
+
 export async function vibiListVoices(
   apiKey: string,
   provider: VibiProvider,
@@ -130,19 +163,17 @@ export async function vibiListVoices(
   const query = search?.trim() ? `&search=${encodeURIComponent(search.trim())}` : "";
 
   if (provider === "minimax") {
-    const data = await vibiFetch<{
-      voice_list?: {
-        voice_id?: string;
-        uniq_id?: string;
-        voice_name?: string;
-        description?: string;
-        sample_audio?: string;
-        cover_url?: string;
-        tag_list?: string[];
-      }[];
-    }>(`/v1/minimax/system-voices?page=1&page_size=60${query}`, apiKey);
+    const list = await vibiListPagedVoices<{
+      voice_id?: string;
+      uniq_id?: string;
+      voice_name?: string;
+      description?: string;
+      sample_audio?: string;
+      cover_url?: string;
+      tag_list?: string[];
+    }>(apiKey, "/v1/minimax/system-voices", search, (data) => data.voice_list ?? []);
 
-    return (data.voice_list ?? []).map((voice) => ({
+    const systemVoices: VibiVoice[] = list.map((voice) => ({
       voice_id: String(voice.voice_id ?? voice.uniq_id ?? ""),
       name: voice.voice_name ?? String(voice.voice_id ?? ""),
       description: voice.description,
@@ -150,20 +181,56 @@ export async function vibiListVoices(
       gender: voice.tag_list?.find((tag) => tag === "Male" || tag === "Female"),
       language: voice.tag_list?.[0],
     }));
+
+    // Voces clonadas por el usuario (solo las listas).
+    let clonedVoices: VibiVoice[] = [];
+    try {
+      const data = await vibiFetch<{
+        voices?: {
+          id?: string;
+          voice_name?: string;
+          sample_audio_url?: string;
+          cover_url?: string;
+          language_tag?: string;
+          gender?: string;
+          status?: string;
+        }[];
+      }>("/v1/minimax/voices", apiKey);
+
+      clonedVoices = (data.voices ?? [])
+        .filter((voice) => voice.status === "done")
+        .map((voice) => ({
+          voice_id: String(voice.id ?? ""),
+          name: voice.voice_name ?? String(voice.id ?? ""),
+          preview_url: voice.sample_audio_url,
+          gender: voice.gender,
+          language: voice.language_tag,
+          cloned: true,
+        }));
+    } catch {
+      // Si no se pueden listar las clonadas, seguimos con las de sistema.
+    }
+
+    const term = search?.trim().toLowerCase();
+    const seen = new Set(systemVoices.map((voice) => voice.voice_id));
+    const merged = [
+      ...systemVoices.filter((voice) => voice.voice_id),
+      ...clonedVoices.filter((voice) => voice.voice_id && !seen.has(voice.voice_id)),
+    ];
+
+    return term ? merged.filter((voice) => voice.name.toLowerCase().includes(term)) : merged;
   }
 
   if (provider === "capcut") {
-    const data = await vibiFetch<{
-      voice_list?: {
-        voice_id?: string;
-        name?: string;
-        language?: string;
-        gender?: string;
-        preview_url?: string;
-      }[];
-    }>(`/v1/capcut/system-voices?page=1&page_size=60${query}`, apiKey);
+    const list = await vibiListPagedVoices<{
+      voice_id?: string;
+      name?: string;
+      language?: string;
+      gender?: string;
+      preview_url?: string;
+    }>(apiKey, "/v1/capcut/system-voices", search, (data) => data.voice_list ?? []);
 
-    return (data.voice_list ?? []).map((voice) => ({
+    return list.map((voice) => ({
       voice_id: String(voice.voice_id ?? ""),
       name: voice.name ?? String(voice.voice_id ?? ""),
       preview_url: voice.preview_url,
@@ -181,7 +248,7 @@ export async function vibiListVoices(
       gender?: string;
       language?: string;
     }[];
-  }>(`/v1/default-voices?page_size=60${query}`, apiKey);
+  }>(`/v1/default-voices?page_size=${VOICE_PAGE_SIZE}${query}`, apiKey);
 
   return (data.voices ?? []).map((voice) => ({
     voice_id: String(voice.voice_id ?? ""),

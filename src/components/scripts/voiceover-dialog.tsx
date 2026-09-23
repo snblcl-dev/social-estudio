@@ -314,6 +314,7 @@ export function VoiceoverDialog({
                     {filteredVoices.map((voice) => (
                       <option key={voice.voice_id} value={voice.voice_id}>
                         {voice.name}
+                        {voice.cloned ? " (clonada)" : ""}
                         {voice.gender ? ` · ${voice.gender}` : ""}
                       </option>
                     ))}

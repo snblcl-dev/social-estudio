@@ -141,6 +141,8 @@ export interface VibiVoice {
   preview_url?: string;
   gender?: string;
   language?: string;
+  /** `true` si es una voz clonada por el usuario (solo MiniMax). */
+  cloned?: boolean;
 }
 
 export interface VibiLanguage {
