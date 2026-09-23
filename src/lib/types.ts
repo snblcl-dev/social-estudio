@@ -130,3 +130,47 @@ export interface ProviderOption {
   suggestedModels: string[];
   custom: boolean;
 }
+
+/** Motor de voz de Vibi. */
+export type VibiProvider = "elevenlabs" | "minimax" | "capcut";
+
+export interface VibiVoice {
+  voice_id: string;
+  name: string;
+  description?: string;
+  preview_url?: string;
+  gender?: string;
+  language?: string;
+}
+
+export interface VibiLanguage {
+  code: string;
+  name: string;
+}
+
+export interface VibiModel {
+  model_id: string;
+  name: string;
+  description?: string;
+}
+
+/** Audio generado a partir de un guion con Vibi. */
+export interface Voiceover {
+  id: string;
+  user_id: string;
+  script_id: string | null;
+  task_id: string;
+  provider: VibiProvider;
+  voice_id: string;
+  model_id: string;
+  language_code: string;
+  status: string;
+  progress: number;
+  audio_url: string | null;
+  error: string | null;
+  text: string;
+  voice_settings: Record<string, unknown>;
+  characters_used: number | null;
+  created_at: string;
+  updated_at: string;
+}

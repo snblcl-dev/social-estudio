@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CopyIcon, EyeIcon, FileTextIcon, Loader2Icon, Trash2Icon } from "lucide-react";
+import {
+  CopyIcon,
+  EyeIcon,
+  FileTextIcon,
+  Loader2Icon,
+  MicIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteScript } from "@/app/actions/scripts";
@@ -20,11 +27,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VoiceoverDialog } from "@/components/scripts/voiceover-dialog";
 import type { Profile, Script } from "@/lib/types";
 
 interface ScriptsListProps {
   scripts: Script[];
   profiles: Profile[];
+  hasVibiKey: boolean;
 }
 
 async function copyToClipboard(value: string, label: string) {
@@ -36,10 +45,11 @@ async function copyToClipboard(value: string, label: string) {
   }
 }
 
-export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
+export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [openScript, setOpenScript] = useState<Script | null>(null);
+  const [voiceoverScript, setVoiceoverScript] = useState<Script | null>(null);
   const [scriptToDelete, setScriptToDelete] = useState<Script | null>(null);
 
   const profileNames = new Map(profiles.map((profile) => [profile.id, profile.name]));
@@ -134,6 +144,14 @@ export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
                 </Button>
               ) : null}
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVoiceoverScript(script)}
+              >
+                <MicIcon />
+                Generar voz
+              </Button>
+              <Button
                 variant="destructive"
                 size="sm"
                 className="ml-auto"
@@ -206,6 +224,15 @@ export function ScriptsList({ scripts, profiles }: ScriptsListProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <VoiceoverDialog
+        script={voiceoverScript}
+        open={voiceoverScript !== null}
+        onOpenChange={(open) => {
+          if (!open) setVoiceoverScript(null);
+        }}
+        hasVibiKey={hasVibiKey}
+      />
 
       <AlertDialog
         open={scriptToDelete !== null}

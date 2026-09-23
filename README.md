@@ -7,6 +7,7 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
 - **Perfiles** con instrucciones personalizadas de estilo de guion y de temas (ej. estilo bíblico).
 - **Prompts de imagen** generados a partir del guion usando tus instrucciones de estilo.
 - **Historial** de guiones guardados, con copiar/descargar.
+- **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut): genera, reproduce y descarga la locución de cada guion.
 - **API keys** guardadas cifradas (AES-256-GCM) en la base de datos.
 - Login de usuario único (Supabase Auth).
 
@@ -70,6 +71,7 @@ para guardar tu primera API key.
 1. **Ajustes** → pega tus API keys (OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter y AIRAI) y
    elige el proveedor y modelo por defecto. También puedes **agregar proveedores
    personalizados** (cualquier endpoint compatible con OpenAI) y **modelos manuales**.
+   Guarda también tu **clave de Vibi** para generar la voz de los guiones.
 2. **Perfiles** → crea perfiles con sus instrucciones: estilo de guion, temas y **prompts de
    imagen** (aquí defines, por ejemplo, cuántas escenas quieres y el estilo visual).
 3. **Chat** → elige perfil, proveedor y modelo; pide un tema y el guion se genera en streaming.
@@ -77,6 +79,8 @@ para guardar tu primera API key.
    usando las instrucciones de prompts de imagen del perfil activo (número de escenas y estilo).
    Puedes copiarlos desde el propio mensaje.
 5. **Guardar respuesta en historial** guarda el último mensaje del asistente en el **Historial**.
+6. **Historial → Generar voz** convierte un guion guardado en audio con Vibi (elige proveedor,
+   voz, idioma y modelo). El audio se reproduce y se puede descargar desde la misma tarjeta.
 
 ## Migraciones de base de datos
 
@@ -92,6 +96,8 @@ Migraciones disponibles:
   orden de los mensajes al recargar una conversación.
 - `0004_custom_providers.sql` → añade `custom_providers` (endpoints propios compatibles con
   OpenAI) y `custom_models` (modelos agregados a mano).
+- `0005_voiceovers.sql` → añade `settings.vibi_api_key` (clave de Vibi cifrada) y `voiceovers`
+  (audios generados a partir de los guiones).
 
 ## Despliegue en Vercel
 
