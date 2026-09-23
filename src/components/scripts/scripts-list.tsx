@@ -8,11 +8,13 @@ import {
   FileTextIcon,
   Loader2Icon,
   MicIcon,
+  PencilIcon,
+  SaveIcon,
   Trash2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { deleteScript } from "@/app/actions/scripts";
+import { deleteScript, updateScript } from "@/app/actions/scripts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +29,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { VoiceoverDialog } from "@/components/scripts/voiceover-dialog";
 import type { Profile, Script } from "@/lib/types";
 
@@ -51,8 +56,38 @@ export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps)
   const [openScript, setOpenScript] = useState<Script | null>(null);
   const [voiceoverScript, setVoiceoverScript] = useState<Script | null>(null);
   const [scriptToDelete, setScriptToDelete] = useState<Script | null>(null);
+  const [editScript, setEditScript] = useState<Script | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
 
   const profileNames = new Map(profiles.map((profile) => [profile.id, profile.name]));
+
+  function startEdit(script: Script) {
+    setEditScript(script);
+    setEditTitle(script.title);
+    setEditContent(script.content);
+  }
+
+  function handleEditSave() {
+    if (!editScript) return;
+
+    startTransition(async () => {
+      const result = await updateScript({
+        id: editScript.id,
+        title: editTitle,
+        content: editContent,
+      });
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success("Guion actualizado.");
+      setEditScript(null);
+      router.refresh();
+    });
+  }
 
   function handleDelete() {
     if (!scriptToDelete) return;
@@ -81,7 +116,7 @@ export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps)
           </span>
           <p className="font-medium">Todavía no has guardado ningún guion</p>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Genera uno en el chat y pulsa «Guardar respuesta en historial».
+            Genera uno en el chat y pulsa «Guardar en Guiones».
           </p>
         </CardContent>
       </Card>
@@ -143,6 +178,10 @@ export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps)
                   Copiar prompts
                 </Button>
               ) : null}
+              <Button variant="outline" size="sm" onClick={() => startEdit(script)}>
+                <PencilIcon />
+                Editar
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -221,6 +260,50 @@ export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps)
                 </div>
               </div>
             ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={editScript !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditScript(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar guion</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-script-title">Título</Label>
+              <Input
+                id="edit-script-title"
+                value={editTitle}
+                onChange={(event) => setEditTitle(event.target.value)}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-script-content">Guion</Label>
+              <Textarea
+                id="edit-script-content"
+                value={editContent}
+                className="max-h-[55vh] min-h-64 overflow-y-auto font-mono"
+                onChange={(event) => setEditContent(event.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setEditScript(null)} disabled={isPending}>
+                Cancelar
+              </Button>
+              <Button onClick={handleEditSave} disabled={isPending}>
+                {isPending ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
+                Guardar
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

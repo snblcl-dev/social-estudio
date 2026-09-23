@@ -6,7 +6,7 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
 - **Proveedores personalizados** compatibles con la API de OpenAI (URL base propia) y **modelos manuales** por si el listado automático no los devuelve.
 - **Perfiles** con instrucciones personalizadas de estilo de guion y de temas (ej. estilo bíblico).
 - **Prompts de imagen** generados a partir del guion usando tus instrucciones de estilo.
-- **Historial** de guiones guardados, con copiar/descargar.
+- **Guiones**: guiones guardados, con ver, **editar**, copiar/descargar y generar voz.
 - **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut): genera, reproduce y descarga la locución de cada guion.
 - **API keys** guardadas cifradas (AES-256-GCM) en la base de datos.
 - Login de usuario único (Supabase Auth).
@@ -78,8 +78,9 @@ para guardar tu primera API key.
 4. Pulsa **Generar prompts de imagen** y los prompts aparecerán **como un mensaje más del chat**,
    usando las instrucciones de prompts de imagen del perfil activo (número de escenas y estilo).
    Puedes copiarlos desde el propio mensaje.
-5. **Guardar respuesta en historial** guarda el último mensaje del asistente en el **Historial**.
-6. **Historial → Generar voz** convierte un guion guardado en audio con Vibi (elige proveedor,
+5. **Guardar en Guiones** guarda el último mensaje del asistente en **Guiones**, donde puedes
+   verlo, **editarlo** (título y contenido), copiarlo o eliminarlo.
+6. **Guiones → Generar voz** convierte un guion guardado en audio con Vibi (elige proveedor,
    voz, idioma y modelo). El audio se reproduce y se puede descargar desde la misma tarjeta.
 
 ## Migraciones de base de datos
@@ -113,7 +114,7 @@ Migraciones disponibles:
 ```
 src/
   app/
-    (app)/              # Chat, Perfiles, Ajustes, Historial (rutas protegidas)
+    (app)/              # Chat, Perfiles, Ajustes, Guiones (rutas protegidas)
     api/chat/           # Streaming de chat y prompts de imagen (AI SDK)
     api/models/         # Listado de modelos por proveedor
     login/              # Inicio de sesión

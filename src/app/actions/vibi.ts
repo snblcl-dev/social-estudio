@@ -155,7 +155,7 @@ export async function startVoiceover(
       return { error: "No se pudo guardar el audio generado." };
     }
 
-    revalidatePath("/historial");
+    revalidatePath("/guiones");
     return { ok: true, id: voiceover.id, voiceover };
   } catch (error) {
     if (error instanceof VibiApiError) return { error: error.message };
@@ -193,7 +193,7 @@ export async function refreshVoiceover(
     });
 
     if (status === "completed" || status === "failed") {
-      revalidatePath("/historial");
+      revalidatePath("/guiones");
     }
 
     return { ok: true, voiceover: updated ?? voiceover };
@@ -217,6 +217,6 @@ export async function deleteVoiceover(id: string): Promise<VibiActionResult> {
   const { error } = await deleteVoiceoverRow(user.id, id);
   if (error) return { error: error.message };
 
-  revalidatePath("/historial");
+  revalidatePath("/guiones");
   return { ok: true };
 }

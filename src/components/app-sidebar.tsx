@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
-  HistoryIcon,
+  FileTextIcon,
   Loader2Icon,
   LogOutIcon,
   MessagesSquareIcon,
@@ -25,7 +25,7 @@ const LINKS = [
   { href: "/", label: "Chat", icon: MessagesSquareIcon },
   { href: "/perfiles", label: "Perfiles", icon: UsersIcon },
   { href: "/ajustes", label: "Ajustes", icon: SettingsIcon },
-  { href: "/historial", label: "Historial", icon: HistoryIcon },
+  { href: "/guiones", label: "Guiones", icon: FileTextIcon },
 ];
 
 export function AppSidebar({ conversations = [] }: { conversations?: Conversation[] }) {

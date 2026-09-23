@@ -241,7 +241,7 @@ export function ChatWorkspace({
         return;
       }
 
-      toast.success("Última respuesta guardada en el historial.");
+      toast.success("Última respuesta guardada en Guiones.");
       router.refresh();
     } finally {
       setIsSavingScript(false);
@@ -380,7 +380,7 @@ export function ChatWorkspace({
             variant="outline"
             onClick={handleSaveScript}
             disabled={isSavingScript || !lastAssistantText}
-            title="Guardar la última respuesta en el historial"
+            title="Guardar la última respuesta en Guiones"
           >
             {isSavingScript ? <Loader2Icon className="animate-spin" /> : <SaveIcon />}
             Guardar

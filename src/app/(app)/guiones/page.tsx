@@ -5,7 +5,7 @@ import { listScripts } from "@/lib/data/scripts";
 import { getVibiKeySummary } from "@/lib/data/vibi";
 import { getCurrentUser } from "@/lib/supabase/server";
 
-export default async function HistoryPage() {
+export default async function ScriptsPage() {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -21,7 +21,7 @@ export default async function HistoryPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
       <PageHeader
-        title="Historial"
+        title="Guiones"
         description="Guiones guardados, sus prompts de imagen y la voz generada."
       />
 
