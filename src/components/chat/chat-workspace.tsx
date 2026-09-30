@@ -78,7 +78,7 @@ export function ChatWorkspace({
 
   // Guarda el historial en el servidor cuando la respuesta termina.
   // Se hace desde el cliente (Server Action) para garantizar que la escritura
-  // en Supabase dispone del contexto de la petición y de la sesión.
+  // dispone del contexto de la petición y de la sesión.
   useEffect(() => {
     if (status !== "ready" || messages.length === 0) return;
 

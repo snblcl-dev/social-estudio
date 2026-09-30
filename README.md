@@ -9,62 +9,70 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
 - **Guiones**: crea guiones **a mano** o guárdalos desde el chat; ver, **editar**, copiar/descargar y generar voz.
 - **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut): genera, reproduce y descarga la locución de cada guion.
 - **API keys** guardadas cifradas (AES-256-GCM) en la base de datos.
-- Login de usuario único (Supabase Auth).
+- Login de usuario único o de pocos usuarios (Better Auth, email + contraseña).
 
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui
-- Supabase (Postgres + Auth + Row Level Security)
+- **SQLite** + [Prisma](https://www.prisma.io) (base de datos local, sin servidor)
+- **Better Auth** (sesiones por cookie, email/contraseña)
 - Vercel AI SDK v7 (`ai`)
 
 ## Requisitos
 
 - Node.js 20.9+ (probado con 24)
-- Cuenta en [supabase.com](https://supabase.com) (plan gratis suficiente)
+
+No necesitas Supabase ni ningún servicio externo: la base de datos es un archivo
+SQLite local.
 
 ## Configuración local
 
-### 1. Crear el proyecto en Supabase
+### 1. Variables de entorno
 
-1. Entra en [supabase.com](https://supabase.com) y crea un proyecto nuevo.
-2. Copia de **Project Settings → API**:
-   - `Project URL`
-   - `anon public key`
-3. Abre el **SQL Editor** y pega el contenido de `supabase/schema.sql`. Ejecútalo.
-4. En **Authentication → Providers**, deja activo *Email* y **desactiva** *Allow new users to sign up* (solo habrá tu cuenta).
-5. En **Authentication → Users**, haz clic en *Add user* y crea tu email y contraseña.
-
-### 2. Variables de entorno
-
-Crea el archivo `.env.local` en la raíz del proyecto (o copia `.env.example`):
+Crea el archivo `.env` (o copia `.env.example`):
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-Rellena:
+Genera los secretos:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Rellena `.env`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu-anon-key
-
-# Genera uno con:
-# node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-API_KEY_ENCRYPTION_SECRET=un-secreto-largo-y-aleatorio
+DATABASE_URL="file:../data/app.db"
+BETTER_AUTH_SECRET=el-secreto-que-generaste
+BETTER_AUTH_URL=http://localhost:3000
+API_KEY_ENCRYPTION_SECRET=otro-secreto-que-generaste
 ```
 
-`API_KEY_ENCRYPTION_SECRET` cifra las API keys de IA antes de guardarlas. Si lo cambias,
-las claves guardadas dejarán de poder descifrarse.
+- `BETTER_AUTH_SECRET` firma las sesiones de Better Auth.
+- `API_KEY_ENCRYPTION_SECRET` cifra las API keys de IA antes de guardarlas. Si lo
+  cambias, las claves guardadas dejarán de poder descifrarse.
+- `DATABASE_URL` apunta al archivo SQLite. La ruta es relativa a `prisma/`.
 
-### 3. Instalar y ejecutar
+### 2. Base de datos y usuario
 
 ```bash
 npm install
+npx prisma migrate deploy        # crea data/app.db con el esquema
+npm run create-user -- --email tu@email.com --password "tu-clave-segura" --name "Tu nombre"
+```
+
+El registro público está desactivado: las cuentas se crean con `create-user`.
+
+### 3. Ejecutar
+
+```bash
 npm run dev
 ```
 
-Abre http://localhost:3000, inicia sesión con tu usuario de Supabase y entra en **Ajustes**
-para guardar tu primera API key.
+Abre http://localhost:3000, inicia sesión y entra en **Ajustes** para guardar tu
+primera API key.
 
 ## Uso
 
@@ -83,31 +91,44 @@ para guardar tu primera API key.
 6. **Guiones → Generar voz** convierte un guion guardado en audio con Vibi (elige proveedor,
    voz, idioma y modelo). El audio se reproduce y se puede descargar desde la misma tarjeta.
 
-## Migraciones de base de datos
+## Base de datos y migraciones
 
-- `supabase/schema.sql` → esquema completo para un proyecto nuevo.
-- `supabase/migrations/` → cambios incrementales para bases de datos ya creadas. Pega cada
-  archivo en el SQL Editor de Supabase en orden.
+El esquema vive en `prisma/schema.prisma` y las migraciones en `prisma/migrations/`.
 
-Migraciones disponibles:
+```bash
+npm run db:migrate       # aplica migraciones pendientes (producción)
+npm run db:migrate:dev   # crea una migración nueva en desarrollo
+npm run db:generate      # regenera el cliente de Prisma
+npm run create-user      # crea una cuenta de usuario
+```
 
-- `0002_profile_image_instructions.sql` → mueve las instrucciones de prompts de imagen de
-  `settings` (global) a `profiles` (una por perfil) y conserva lo que ya tenías.
-- `0003_messages_position.sql` → añade una columna `position` a `messages` para garantizar el
-  orden de los mensajes al recargar una conversación.
-- `0004_custom_providers.sql` → añade `custom_providers` (endpoints propios compatibles con
-  OpenAI) y `custom_models` (modelos agregados a mano).
-- `0005_voiceovers.sql` → añade `settings.vibi_api_key` (clave de Vibi cifrada) y `voiceovers`
-  (audios generados a partir de los guiones).
+## Despliegue en un VPS (Node + systemd)
 
-## Despliegue en Vercel
+1. Copia el proyecto al servidor (por ejemplo en `/opt/social-estudio`) y crea el
+   archivo `.env` con `DATABASE_URL="file:../data/app.db"`,
+   `BETTER_AUTH_URL=https://tu-dominio.com`, `BETTER_AUTH_SECRET` y
+   `API_KEY_ENCRYPTION_SECRET`.
+2. Instala y compila:
 
-1. Sube el proyecto a GitHub (repositorio privado).
-2. En [vercel.com](https://vercel.com) → **Add New → Project** → importa el repositorio.
-3. Framework: **Next.js** (detección automática).
-4. Añade las mismas variables de entorno del paso 2 y despliega.
-5. En Supabase → **Authentication → URL Configuration**, añade la URL de tu deployment a
-   *Site URL* y añade `http://localhost:3000` a *Redirect URLs*.
+   ```bash
+   bash scripts/deploy.sh
+   ```
+
+3. Crea el usuario del sistema y el servicio:
+
+   ```bash
+   sudo useradd --system --home /opt/social-estudio --shell /usr/sbin/nologin socialestudio
+   sudo chown -R socialestudio:socialestudio /opt/social-estudio
+   sudo cp deploy/social-estudio.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now social-estudio
+   ```
+
+4. Configura tu reverse proxy (Caddy/Nginx) para que `https://tu-dominio.com`
+   apunte a `http://127.0.0.1:3000`.
+
+El archivo SQLite se guarda en `data/`. **Haz copias de seguridad de `data/app.db`**
+(con la app parada o mediante `sqlite3 data/app.db ".backup backup.db"`).
 
 ## Estructura relevante
 
@@ -116,23 +137,29 @@ src/
   app/
     (app)/              # Chat, Perfiles, Ajustes, Guiones (rutas protegidas)
     api/chat/           # Streaming de chat y prompts de imagen (AI SDK)
+    api/auth/           # Handler de Better Auth
     api/models/         # Listado de modelos por proveedor
-    login/              # Inicio de sesión
     actions/            # Server Actions (CRUD y auth)
   lib/
-    supabase/           # Clientes de Supabase (cliente, servidor, proxy)
-    ai/                 # Resolución de modelos por proveedor
+    auth.ts             # Instancia de Better Auth
+    session.ts          # getCurrentUser (sesión en el servidor)
+    db.ts               # Cliente de Prisma
     data/               # Acceso a datos
-  proxy.ts              # Refresco de sesión y protección de rutas
-supabase/schema.sql     # Esquema de la base de datos + RLS
-supabase/migrations/    # Migraciones incrementales
+    ai/                 # Resolución de modelos por proveedor
+  proxy.ts              # Protección de rutas
+prisma/schema.prisma    # Esquema de la base de datos
+prisma/migrations/      # Migraciones
+scripts/create-user.ts  # Alta manual de usuarios
+deploy/                 # Unidad systemd
 ```
 
 ## Comandos
 
 ```bash
-npm run dev       # desarrollo
-npm run build     # build de producción
-npm run start     # servir el build
-npm run lint      # ESLint
+npm run dev          # desarrollo
+npm run build        # build de producción
+npm run start        # servir el build
+npm run lint         # ESLint
+npm run create-user  # crear un usuario
+npm run db:migrate   # aplicar migraciones
 ```

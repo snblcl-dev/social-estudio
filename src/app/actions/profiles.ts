@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 
 const profileSchema = z.object({
   name: z.string().trim().min(1, "El nombre es obligatorio.").max(80),
@@ -26,6 +27,10 @@ function revalidateProfilePaths() {
   revalidatePath("/");
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "No se pudo guardar el cambio.";
+}
+
 export async function createProfile(input: ProfileInput): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
@@ -35,17 +40,17 @@ export async function createProfile(input: ProfileInput): Promise<ActionResult> 
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .insert({ user_id: user.id, ...parsed.data })
-    .select("id")
-    .single();
+  try {
+    const created = await prisma.profile.create({
+      data: { user_id: user.id, ...parsed.data },
+      select: { id: true },
+    });
 
-  if (error) return { error: error.message };
-
-  revalidateProfilePaths();
-  return { ok: true, id: data?.id as string | undefined };
+    revalidateProfilePaths();
+    return { ok: true, id: created.id };
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 }
 
 export async function updateProfile(
@@ -60,14 +65,14 @@ export async function updateProfile(
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.profile.updateMany({
+      where: { id, user_id: user.id },
+      data: parsed.data,
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateProfilePaths();
   return { ok: true };
@@ -77,14 +82,13 @@ export async function deleteProfile(id: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("profiles")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.profile.deleteMany({
+      where: { id, user_id: user.id },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateProfilePaths();
   return { ok: true };

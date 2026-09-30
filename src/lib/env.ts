@@ -1,12 +1,13 @@
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+export const BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ?? "";
+export const BETTER_AUTH_URL = process.env.BETTER_AUTH_URL ?? "";
 
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+/** Se considera configurada la app cuando existe el secreto de Better Auth. */
+export const isAuthConfigured = Boolean(BETTER_AUTH_SECRET);
 
-export function assertSupabaseConfigured() {
-  if (!isSupabaseConfigured) {
+export function assertAuthConfigured() {
+  if (!isAuthConfigured) {
     throw new Error(
-      "Supabase no está configurado. Rellena NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en .env.local",
+      "Better Auth no está configurado. Rellena BETTER_AUTH_SECRET en el archivo .env",
     );
   }
 }

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { listModelsForProvider } from "@/lib/ai/model-lists";
 import { isProviderKey } from "@/lib/providers";
 import { resolveProvider } from "@/lib/providers-server";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import type { ProviderKey } from "@/lib/types";
 
 export const dynamic = "force-dynamic";

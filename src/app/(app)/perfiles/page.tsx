@@ -1,6 +1,6 @@
 import { ProfilesManager } from "@/components/profiles/profiles-manager";
 import { listProfiles } from "@/lib/data/profiles";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 
 export default async function ProfilesPage() {
   const user = await getCurrentUser();

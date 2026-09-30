@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { encryptSecret } from "@/lib/crypto";
+import { prisma } from "@/lib/db";
 import { isProviderKey } from "@/lib/providers";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 
 const settingsSchema = z.object({
   default_provider: z.string(),
@@ -27,6 +28,10 @@ function revalidateSettings() {
   revalidatePath("/");
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "No se pudo guardar el cambio.";
+}
+
 export async function saveSettings(input: SettingsInput): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
@@ -40,18 +45,22 @@ export async function saveSettings(input: SettingsInput): Promise<ActionResult> 
     return { error: "Proveedor por defecto inválido." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("settings").upsert(
-    {
-      user_id: user.id,
-      default_provider: parsed.data.default_provider,
-      default_model: parsed.data.default_model,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" },
-  );
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.settings.upsert({
+      where: { user_id: user.id },
+      create: {
+        user_id: user.id,
+        default_provider: parsed.data.default_provider,
+        default_model: parsed.data.default_model,
+      },
+      update: {
+        default_provider: parsed.data.default_provider,
+        default_model: parsed.data.default_model,
+      },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateSettings();
   return { ok: true };
@@ -73,18 +82,16 @@ export async function saveApiKey(input: {
     return { error: "Esa clave parece demasiado corta." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("api_keys").upsert(
-    {
-      user_id: user.id,
-      provider: input.provider,
-      encrypted_key: encryptSecret(rawKey),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,provider" },
-  );
-
-  if (error) return { error: error.message };
+  try {
+    const encrypted_key = encryptSecret(rawKey);
+    await prisma.apiKey.upsert({
+      where: { user_id_provider: { user_id: user.id, provider: input.provider } },
+      create: { user_id: user.id, provider: input.provider, encrypted_key },
+      update: { encrypted_key },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateSettings();
   return { ok: true };
@@ -98,14 +105,13 @@ export async function deleteApiKey(provider: string): Promise<ActionResult> {
     return { error: "Proveedor inválido." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("api_keys")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("provider", provider);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.apiKey.deleteMany({
+      where: { user_id: user.id, provider },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateSettings();
   return { ok: true };

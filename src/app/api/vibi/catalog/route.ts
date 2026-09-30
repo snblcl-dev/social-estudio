@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getVibiApiKey } from "@/lib/data/vibi";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import type { VibiProvider } from "@/lib/types";
 import { vibiListLanguages, vibiListModels, vibiListVoices } from "@/lib/vibi";
 

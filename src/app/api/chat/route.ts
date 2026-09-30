@@ -6,14 +6,14 @@ import {
   toUIMessageStream,
   type UIMessage,
 } from "ai";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse, after } from "next/server";
 import { z } from "zod";
 
 import { MissingApiKeyError, resolveModelForUser } from "@/lib/ai/model";
 import { getProfile } from "@/lib/data/profiles";
+import { prisma } from "@/lib/db";
 import { isProviderKey } from "@/lib/providers";
-import { createClient, createClientWithToken } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import type { Profile, ProviderKey } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -97,7 +97,6 @@ function buildInstructions(profile: Profile | null) {
 }
 
 async function persistConversation(
-  supabase: SupabaseClient,
   userId: string,
   conversationId: string,
   messages: UIMessage[],
@@ -110,16 +109,22 @@ async function persistConversation(
       conversation_id: conversationId,
       user_id: userId,
       role: message.role,
-      parts: message.parts,
+      parts: JSON.stringify(message.parts),
       position: index,
     }));
 
   if (rows.length > 0) {
-    const { error: messagesError } = await supabase
-      .from("messages")
-      .upsert(rows, { onConflict: "id" });
-
-    if (messagesError) {
+    try {
+      await prisma.$transaction(
+        rows.map((row) =>
+          prisma.message.upsert({
+            where: { id: row.id },
+            create: row,
+            update: { role: row.role, parts: row.parts, position: row.position },
+          }),
+        ),
+      );
+    } catch (messagesError) {
       console.error("[api/chat] error al guardar mensajes", messagesError);
     }
   }
@@ -129,22 +134,17 @@ async function persistConversation(
     ? extractText(firstUserMessage).slice(0, 80) || "Nueva conversación"
     : undefined;
 
-  const updates: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-    provider: meta.provider,
-    model: meta.model,
-  };
-
-  if (title) updates.title = title;
-  if (meta.profileId) updates.profile_id = meta.profileId;
-
-  const { error: conversationError } = await supabase
-    .from("conversations")
-    .update(updates)
-    .eq("id", conversationId)
-    .eq("user_id", userId);
-
-  if (conversationError) {
+  try {
+    await prisma.conversation.updateMany({
+      where: { id: conversationId, user_id: userId },
+      data: {
+        provider: meta.provider,
+        model: meta.model,
+        ...(title ? { title } : {}),
+        ...(meta.profileId ? { profile_id: meta.profileId } : {}),
+      },
+    });
+  } catch (conversationError) {
     console.error("[api/chat] error al actualizar la conversación", conversationError);
   }
 }
@@ -157,21 +157,11 @@ function extractText(message: UIMessage) {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     return NextResponse.json({ error: "No autenticado." }, { status: 401 });
   }
-
-  // Token de sesión para poder escribir en Supabase dentro de `after`
-  // sin depender de `cookies()`.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const accessToken = session?.access_token ?? null;
 
   let payload: unknown;
 
@@ -226,16 +216,10 @@ export async function POST(request: Request) {
       resolveFinalMessages = resolve;
     });
 
-    // `after` se ejecuta cuando la respuesta ha terminado. Usamos un cliente
-    // autenticado con el token de sesión (no con cookies) para que la escritura
-    // en Supabase funcione aunque el contexto de la petición ya no esté activo.
+    // `after` se ejecuta cuando la respuesta ha terminado. Escribimos con
+    // Prisma directamente usando el `userId` ya resuelto.
     after(async () => {
       try {
-        if (!accessToken) {
-          console.warn("[api/chat] sin token de sesión, no se guardará la conversación");
-          return;
-        }
-
         const completed = await Promise.race([
           finalMessages,
           new Promise<UIMessage[]>((resolve) => setTimeout(() => resolve([]), 30000)),
@@ -246,17 +230,11 @@ export async function POST(request: Request) {
           return;
         }
 
-        await persistConversation(
-          createClientWithToken(accessToken),
-          user.id,
-          conversationId,
-          completed,
-          {
-            provider,
-            model,
-            profileId: profileId ?? null,
-          },
-        );
+        await persistConversation(user.id, conversationId, completed, {
+          provider,
+          model,
+          profileId: profileId ?? null,
+        });
       } catch (persistError) {
         console.error("[api/chat] error al guardar la conversación", persistError);
       }

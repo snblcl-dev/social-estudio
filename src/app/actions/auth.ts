@@ -1,8 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/auth";
 
 export interface AuthActionState {
   error?: string;
@@ -19,10 +20,12 @@ export async function signIn(
     return { error: "Introduce tu email y tu contraseña." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-  if (error) {
+  try {
+    await auth.api.signInEmail({
+      body: { email, password, rememberMe: true },
+      headers: await headers(),
+    });
+  } catch {
     return { error: "Email o contraseña incorrectos." };
   }
 
@@ -30,7 +33,6 @@ export async function signIn(
 }
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await auth.api.signOut({ headers: await headers() });
   redirect("/login");
 }

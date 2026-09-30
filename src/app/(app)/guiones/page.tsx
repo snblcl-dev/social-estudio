@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { listProfiles } from "@/lib/data/profiles";
 import { listScripts } from "@/lib/data/scripts";
 import { getVibiKeySummary } from "@/lib/data/vibi";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 
 export default async function ScriptsPage() {
   const user = await getCurrentUser();

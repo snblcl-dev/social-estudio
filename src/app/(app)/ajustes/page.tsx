@@ -8,7 +8,7 @@ import { listCustomModels, listCustomProviders } from "@/lib/data/custom-provide
 import { getSettings, listApiKeySummaries } from "@/lib/data/settings";
 import { getVibiKeySummary } from "@/lib/data/vibi";
 import { listProviderOptions } from "@/lib/providers-server";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import type { ProviderKey } from "@/lib/types";
 
 export default async function SettingsPage() {

@@ -1,30 +1,44 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
-import type { Script } from "@/lib/types";
+import { parseJson, prisma } from "@/lib/db";
+import type { ImagePrompt, Script } from "@/lib/types";
+
+function toScript(row: {
+  id: string;
+  user_id: string;
+  conversation_id: string | null;
+  profile_id: string | null;
+  title: string;
+  content: string;
+  image_prompts: string;
+  created_at: Date;
+}): Script {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    conversation_id: row.conversation_id,
+    profile_id: row.profile_id,
+    title: row.title,
+    content: row.content,
+    image_prompts: parseJson<ImagePrompt[]>(row.image_prompts, []),
+    created_at: row.created_at.toISOString(),
+  };
+}
 
 export async function listScripts(userId: string, limit = 50): Promise<Script[]> {
-  const supabase = await createClient();
+  const rows = await prisma.script.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: "desc" },
+    take: limit,
+  });
 
-  const { data } = await supabase
-    .from("scripts")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  return (data as Script[] | null) ?? [];
+  return rows.map(toScript);
 }
 
 export async function getScript(userId: string, id: string): Promise<Script | null> {
-  const supabase = await createClient();
+  const row = await prisma.script.findFirst({
+    where: { id, user_id: userId },
+  });
 
-  const { data } = await supabase
-    .from("scripts")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("id", id)
-    .maybeSingle();
-
-  return (data as Script | null) ?? null;
+  return row ? toScript(row) : null;
 }

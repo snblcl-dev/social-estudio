@@ -1,0 +1,19 @@
+[Unit]
+Description=Social Estudio (Next.js)
+After=network.target
+
+[Service]
+Type=simple
+# Usuario del sistema que ejecuta la app (créalo con: useradd --system socialestudio)
+User=socialestudio
+Group=socialestudio
+WorkingDirectory=/opt/social-estudio
+EnvironmentFile=/opt/social-estudio/.env
+# Aplica migraciones pendientes antes de arrancar.
+ExecStartPre=/usr/bin/npm run db:migrate
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

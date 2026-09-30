@@ -8,7 +8,7 @@ import { listProfiles } from "@/lib/data/profiles";
 import { getSettings, listConfiguredProviders } from "@/lib/data/settings";
 import { isProviderKey } from "@/lib/providers";
 import { listProviderOptions } from "@/lib/providers-server";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import type { ProviderKey } from "@/lib/types";
 
 export default async function ChatPage({

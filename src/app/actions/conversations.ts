@@ -1,10 +1,12 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { prisma } from "@/lib/db";
 import { isProviderKey } from "@/lib/providers";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 
 export interface ActionResult {
   error?: string;
@@ -30,6 +32,10 @@ const saveMessagesSchema = z.object({
 });
 
 export type SaveMessagesInput = z.input<typeof saveMessagesSchema>;
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "No se pudo guardar el cambio.";
+}
 
 function partsToText(parts: unknown[]) {
   return parts
@@ -57,8 +63,6 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
     return { error: "Proveedor inválido." };
   }
 
-  const supabase = await createClient();
-
   const rows = parsed.data.messages
     .filter((message) => message.role === "user" || message.role === "assistant")
     .map((message, index) => ({
@@ -66,7 +70,7 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
       conversation_id: parsed.data.conversationId,
       user_id: user.id,
       role: message.role,
-      parts: message.parts,
+      parts: JSON.stringify(message.parts),
       position: index,
     }));
 
@@ -74,38 +78,34 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
     return { error: "No hay mensajes que guardar." };
   }
 
-  const { error: messagesError } = await supabase
-    .from("messages")
-    .upsert(rows, { onConflict: "id" });
-
-  if (messagesError) {
-    console.error("[saveConversationMessages] messages", messagesError);
-    return { error: messagesError.message };
-  }
-
   const firstUserMessage = parsed.data.messages.find((message) => message.role === "user");
   const title = firstUserMessage
     ? partsToText(firstUserMessage.parts).slice(0, 80) || "Nueva conversación"
     : undefined;
 
-  const updates: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-    provider: parsed.data.provider,
-    model: parsed.data.model,
-  };
+  try {
+    await prisma.$transaction(
+      rows.map((row) =>
+        prisma.message.upsert({
+          where: { id: row.id },
+          create: row,
+          update: { role: row.role, parts: row.parts, position: row.position },
+        }),
+      ),
+    );
 
-  if (title) updates.title = title;
-  if (parsed.data.profileId) updates.profile_id = parsed.data.profileId;
-
-  const { error: conversationError } = await supabase
-    .from("conversations")
-    .update(updates)
-    .eq("id", parsed.data.conversationId)
-    .eq("user_id", user.id);
-
-  if (conversationError) {
-    console.error("[saveConversationMessages] conversation", conversationError);
-    return { error: conversationError.message };
+    await prisma.conversation.updateMany({
+      where: { id: parsed.data.conversationId, user_id: user.id },
+      data: {
+        provider: parsed.data.provider,
+        model: parsed.data.model,
+        ...(title ? { title } : {}),
+        ...(parsed.data.profileId ? { profile_id: parsed.data.profileId } : {}),
+      },
+    });
+  } catch (error) {
+    console.error("[saveConversationMessages]", error);
+    return { error: errorMessage(error) };
   }
 
   revalidatePath("/");
@@ -125,23 +125,23 @@ export async function createConversation(input: {
     return { error: "Proveedor inválido." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("conversations")
-    .insert({
-      user_id: user.id,
-      profile_id: input.profileId,
-      provider: input.provider,
-      model: input.model,
-      title: input.title?.trim() || "Nueva conversación",
-    })
-    .select("id")
-    .single();
+  try {
+    const created = await prisma.conversation.create({
+      data: {
+        user_id: user.id,
+        profile_id: input.profileId,
+        provider: input.provider,
+        model: input.model,
+        title: input.title?.trim() || "Nueva conversación",
+      },
+      select: { id: true },
+    });
 
-  if (error) return { error: error.message };
-
-  revalidatePath("/");
-  return { ok: true, id: data?.id as string | undefined };
+    revalidatePath("/");
+    return { ok: true, id: created.id };
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 }
 
 export async function updateConversation(input: {
@@ -154,24 +154,24 @@ export async function updateConversation(input: {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const data: Prisma.ConversationUncheckedUpdateManyInput = {};
 
-  if (typeof input.title === "string") updates.title = input.title.trim() || "Sin título";
-  if (input.profileId !== undefined) updates.profile_id = input.profileId;
-  if (input.model) updates.model = input.model;
+  if (typeof input.title === "string") data.title = input.title.trim() || "Sin título";
+  if (input.profileId !== undefined) data.profile_id = input.profileId;
+  if (input.model) data.model = input.model;
   if (input.provider) {
     if (!isProviderKey(input.provider)) return { error: "Proveedor inválido." };
-    updates.provider = input.provider;
+    data.provider = input.provider;
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("conversations")
-    .update(updates)
-    .eq("id", input.id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.conversation.updateMany({
+      where: { id: input.id, user_id: user.id },
+      data,
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidatePath("/");
   return { ok: true };
@@ -181,14 +181,13 @@ export async function deleteConversation(id: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("conversations")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.conversation.deleteMany({
+      where: { id, user_id: user.id },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidatePath("/");
   return { ok: true };

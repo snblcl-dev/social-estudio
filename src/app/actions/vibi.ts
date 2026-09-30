@@ -14,7 +14,7 @@ import {
   saveVibiApiKey,
   updateVoiceover,
 } from "@/lib/data/vibi";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 import type { Voiceover } from "@/lib/types";
 import {
   VibiApiError,
@@ -44,8 +44,11 @@ export async function saveVibiKey(input: { apiKey: string }): Promise<VibiAction
     return { error: "Esa clave parece demasiado corta." };
   }
 
-  const { error } = await saveVibiApiKey(user.id, rawKey);
-  if (error) return { error: error.message };
+  try {
+    await saveVibiApiKey(user.id, rawKey);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo guardar la clave." };
+  }
 
   revalidatePath("/ajustes");
   return { ok: true };
@@ -55,8 +58,11 @@ export async function deleteVibiKey(): Promise<VibiActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const { error } = await clearVibiApiKey(user.id);
-  if (error) return { error: error.message };
+  try {
+    await clearVibiApiKey(user.id);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo borrar la clave." };
+  }
 
   revalidatePath("/ajustes");
   return { ok: true };
@@ -214,8 +220,11 @@ export async function deleteVoiceover(id: string): Promise<VibiActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const { error } = await deleteVoiceoverRow(user.id, id);
-  if (error) return { error: error.message };
+  try {
+    await deleteVoiceoverRow(user.id, id);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudo borrar el audio." };
+  }
 
   revalidatePath("/guiones");
   return { ok: true };

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
 
 const imagePromptSchema = z.object({
   index: z.number().int().nonnegative(),
@@ -27,6 +28,10 @@ export interface ActionResult {
   id?: string;
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "No se pudo guardar el cambio.";
+}
+
 export async function saveScript(input: ScriptInput): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
@@ -36,24 +41,24 @@ export async function saveScript(input: ScriptInput): Promise<ActionResult> {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("scripts")
-    .insert({
-      user_id: user.id,
-      conversation_id: parsed.data.conversationId,
-      profile_id: parsed.data.profileId,
-      title: parsed.data.title,
-      content: parsed.data.content,
-      image_prompts: parsed.data.imagePrompts,
-    })
-    .select("id")
-    .single();
+  try {
+    const created = await prisma.script.create({
+      data: {
+        user_id: user.id,
+        conversation_id: parsed.data.conversationId,
+        profile_id: parsed.data.profileId,
+        title: parsed.data.title,
+        content: parsed.data.content,
+        image_prompts: JSON.stringify(parsed.data.imagePrompts),
+      },
+      select: { id: true },
+    });
 
-  if (error) return { error: error.message };
-
-  revalidatePath("/guiones");
-  return { ok: true, id: data?.id as string | undefined };
+    revalidatePath("/guiones");
+    return { ok: true, id: created.id };
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 }
 
 const updateScriptSchema = z.object({
@@ -74,23 +79,20 @@ export async function updateScript(input: UpdateScriptInput): Promise<ActionResu
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos." };
   }
 
-  const patch: Record<string, unknown> = {
-    title: parsed.data.title,
-    content: parsed.data.content,
-  };
-
-  if (parsed.data.imagePrompts !== undefined) {
-    patch.image_prompts = parsed.data.imagePrompts;
+  try {
+    await prisma.script.updateMany({
+      where: { id: parsed.data.id, user_id: user.id },
+      data: {
+        title: parsed.data.title,
+        content: parsed.data.content,
+        ...(parsed.data.imagePrompts !== undefined
+          ? { image_prompts: JSON.stringify(parsed.data.imagePrompts) }
+          : {}),
+      },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
   }
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("scripts")
-    .update(patch)
-    .eq("id", parsed.data.id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
 
   revalidatePath("/guiones");
   return { ok: true };
@@ -103,14 +105,14 @@ export async function updateScriptImagePrompts(
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("scripts")
-    .update({ image_prompts: imagePrompts })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.script.updateMany({
+      where: { id, user_id: user.id },
+      data: { image_prompts: JSON.stringify(imagePrompts ?? []) },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidatePath("/guiones");
   return { ok: true };
@@ -120,10 +122,11 @@ export async function deleteScript(id: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("scripts").delete().eq("id", id).eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.script.deleteMany({ where: { id, user_id: user.id } });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidatePath("/guiones");
   return { ok: true };

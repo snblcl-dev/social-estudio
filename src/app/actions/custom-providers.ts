@@ -5,8 +5,9 @@ import { z } from "zod";
 
 import { encryptSecret } from "@/lib/crypto";
 import { getCustomProvider } from "@/lib/data/custom-providers";
+import { prisma } from "@/lib/db";
 import { isProviderKey, normalizeBaseUrl, toCustomProviderKey } from "@/lib/providers";
-import { createClient, getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/session";
 
 export interface CustomActionResult {
   error?: string;
@@ -17,6 +18,10 @@ export interface CustomActionResult {
 function revalidateProviders() {
   revalidatePath("/ajustes");
   revalidatePath("/");
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "No se pudo guardar el cambio.";
 }
 
 const providerSchema = z.object({
@@ -43,53 +48,46 @@ export async function saveCustomProvider(
   const defaultModel = parsed.data.defaultModel?.trim() ?? "";
   const rawKey = parsed.data.apiKey?.trim() ?? "";
 
-  const supabase = await createClient();
-
   let providerId = input.id?.trim() || "";
 
-  if (providerId) {
-    const existing = await getCustomProvider(user.id, providerId);
-    if (!existing) return { error: "El proveedor no existe." };
+  try {
+    if (providerId) {
+      const existing = await getCustomProvider(user.id, providerId);
+      if (!existing) return { error: "El proveedor no existe." };
 
-    const { error } = await supabase
-      .from("custom_providers")
-      .update({ name: parsed.data.name, base_url: baseUrl, default_model: defaultModel })
-      .eq("id", providerId)
-      .eq("user_id", user.id);
-
-    if (error) return { error: error.message };
-  } else {
-    const { data, error } = await supabase
-      .from("custom_providers")
-      .insert({
-        user_id: user.id,
-        name: parsed.data.name,
-        base_url: baseUrl,
-        default_model: defaultModel,
-      })
-      .select("id")
-      .single();
-
-    if (error) return { error: error.message };
-    providerId = data?.id as string;
-  }
-
-  if (rawKey) {
-    if (rawKey.length < 8) {
-      return { error: "Esa clave parece demasiado corta." };
+      await prisma.customProvider.updateMany({
+        where: { id: providerId, user_id: user.id },
+        data: { name: parsed.data.name, base_url: baseUrl, default_model: defaultModel },
+      });
+    } else {
+      const created = await prisma.customProvider.create({
+        data: {
+          user_id: user.id,
+          name: parsed.data.name,
+          base_url: baseUrl,
+          default_model: defaultModel,
+        },
+        select: { id: true },
+      });
+      providerId = created.id;
     }
 
-    const { error: keyError } = await supabase.from("api_keys").upsert(
-      {
-        user_id: user.id,
-        provider: toCustomProviderKey(providerId),
-        encrypted_key: encryptSecret(rawKey),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,provider" },
-    );
+    if (rawKey) {
+      if (rawKey.length < 8) {
+        return { error: "Esa clave parece demasiado corta." };
+      }
 
-    if (keyError) return { error: keyError.message };
+      const encrypted_key = encryptSecret(rawKey);
+      const provider = toCustomProviderKey(providerId);
+
+      await prisma.apiKey.upsert({
+        where: { user_id_provider: { user_id: user.id, provider } },
+        create: { user_id: user.id, provider, encrypted_key },
+        update: { encrypted_key },
+      });
+    }
+  } catch (error) {
+    return { error: errorMessage(error) };
   }
 
   revalidateProviders();
@@ -104,31 +102,16 @@ export async function deleteCustomProvider(id: string): Promise<CustomActionResu
   if (!existing) return { error: "El proveedor no existe." };
 
   const providerKey = toCustomProviderKey(id);
-  const supabase = await createClient();
 
-  const { error: modelsError } = await supabase
-    .from("custom_models")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("provider", providerKey);
-
-  if (modelsError) return { error: modelsError.message };
-
-  const { error: keyError } = await supabase
-    .from("api_keys")
-    .delete()
-    .eq("user_id", user.id)
-    .eq("provider", providerKey);
-
-  if (keyError) return { error: keyError.message };
-
-  const { error } = await supabase
-    .from("custom_providers")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.$transaction([
+      prisma.customModel.deleteMany({ where: { user_id: user.id, provider: providerKey } }),
+      prisma.apiKey.deleteMany({ where: { user_id: user.id, provider: providerKey } }),
+      prisma.customProvider.deleteMany({ where: { id, user_id: user.id } }),
+    ]);
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateProviders();
   return { ok: true };
@@ -156,17 +139,25 @@ export async function saveCustomModel(
     return { error: "Proveedor inválido." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.from("custom_models").upsert(
-    {
-      user_id: user.id,
-      provider: parsed.data.provider,
-      model: parsed.data.model,
-    },
-    { onConflict: "user_id,provider,model" },
-  );
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.customModel.upsert({
+      where: {
+        user_id_provider_model: {
+          user_id: user.id,
+          provider: parsed.data.provider,
+          model: parsed.data.model,
+        },
+      },
+      create: {
+        user_id: user.id,
+        provider: parsed.data.provider,
+        model: parsed.data.model,
+      },
+      update: {},
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateProviders();
   return { ok: true };
@@ -176,14 +167,13 @@ export async function deleteCustomModel(id: string): Promise<CustomActionResult>
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("custom_models")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) return { error: error.message };
+  try {
+    await prisma.customModel.deleteMany({
+      where: { id, user_id: user.id },
+    });
+  } catch (error) {
+    return { error: errorMessage(error) };
+  }
 
   revalidateProviders();
   return { ok: true };

@@ -1,7 +1,7 @@
 import { SparklesIcon } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isAuthConfigured } from "@/lib/env";
 
 import { LoginForm } from "./login-form";
 
@@ -22,22 +22,22 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="text-lg">Iniciar sesión</CardTitle>
             <CardDescription>
-              {isSupabaseConfigured
+              {isAuthConfigured
                 ? "Inicia sesión para acceder a tus perfiles y guiones."
-                : "Falta conectar Supabase"}
+                : "Falta configurar la aplicación"}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isSupabaseConfigured ? (
+            {isAuthConfigured ? (
               <LoginForm />
             ) : (
               <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                 <p>
-                  Crea un archivo <code className="font-mono">.env.local</code> y rellena:
+                  Crea un archivo <code className="font-mono">.env</code> y rellena:
                 </p>
                 <pre className="rounded-lg border border-border/60 bg-muted/50 p-3 font-mono text-xs">
-                  NEXT_PUBLIC_SUPABASE_URL{"\n"}
-                  NEXT_PUBLIC_SUPABASE_ANON_KEY{"\n"}
+                  DATABASE_URL{"\n"}
+                  BETTER_AUTH_SECRET{"\n"}
                   API_KEY_ENCRYPTION_SECRET
                 </pre>
                 <p>

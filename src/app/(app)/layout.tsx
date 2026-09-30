@@ -5,25 +5,25 @@ import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listConversations } from "@/lib/data/conversations";
-import { isSupabaseConfigured } from "@/lib/env";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { isAuthConfigured } from "@/lib/env";
+import { getCurrentUser } from "@/lib/session";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  if (!isSupabaseConfigured) {
+  if (!isAuthConfigured) {
     return (
       <main className="flex min-h-dvh items-center justify-center p-4">
         <Card className="w-full max-w-lg">
           <CardHeader>
-            <CardTitle>Falta conectar Supabase</CardTitle>
+            <CardTitle>Falta configuración</CardTitle>
             <CardDescription>
-              Rellena el archivo <code className="font-mono">.env.local</code> con tus
-              credenciales y reinicia el servidor.
+              Rellena el archivo <code className="font-mono">.env</code> y reinicia el
+              servidor.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <pre className="rounded-lg border border-border/60 bg-muted/50 p-3 font-mono text-xs">
-              NEXT_PUBLIC_SUPABASE_URL{"\n"}
-              NEXT_PUBLIC_SUPABASE_ANON_KEY{"\n"}
+              DATABASE_URL{"\n"}
+              BETTER_AUTH_SECRET{"\n"}
               API_KEY_ENCRYPTION_SECRET
             </pre>
           </CardContent>

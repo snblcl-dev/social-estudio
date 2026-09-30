@@ -1,0 +1,268 @@
+// Social Estudio - Esquema de base de datos (SQLite + Prisma)
+// Reemplaza el esquema de Supabase. Sin RLS: el aislamiento por usuario se
+// hace en la capa de datos filtrando siempre por `user_id`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Better Auth: User / Session / Account / Verification
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String   @id
+  name          String
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+
+  profiles        Profile[]
+  settings        Settings?
+  apiKeys         ApiKey[]
+  conversations   Conversation[]
+  messages        Message[]
+  scripts         Script[]
+  customProviders CustomProvider[]
+  customModels    CustomModel[]
+  voiceovers      Voiceover[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+
+  @@index([identifier])
+}
+
+// ---------------------------------------------------------------------------
+// PERFILES: instrucciones de estilo de guion, temas y prompts de imagen
+// ---------------------------------------------------------------------------
+
+model Profile {
+  id                        String   @id @default(uuid())
+  user_id                   String
+  name                      String
+  description               String   @default("")
+  script_instructions       String   @default("")
+  theme_instructions        String   @default("")
+  image_prompt_instructions String   @default("")
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+
+  user          User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+  scripts       Script[]
+
+  @@index([user_id, name])
+}
+
+// ---------------------------------------------------------------------------
+// SETTINGS: una fila por usuario (proveedor y modelo por defecto)
+// ---------------------------------------------------------------------------
+
+model Settings {
+  user_id          String   @id
+  default_provider String   @default("openai")
+  default_model    String   @default("")
+  vibi_api_key     String?
+  updated_at       DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// API_KEYS: claves de IA cifradas con AES-256-GCM (una por proveedor)
+// ---------------------------------------------------------------------------
+
+model ApiKey {
+  id            String   @id @default(uuid())
+  user_id       String
+  provider      String
+  encrypted_key String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, provider])
+  @@index([user_id])
+}
+
+// ---------------------------------------------------------------------------
+// CONVERSATIONS: hilos de chat
+// ---------------------------------------------------------------------------
+
+model Conversation {
+  id         String   @id @default(uuid())
+  user_id    String
+  profile_id String?
+  title      String   @default("Nueva conversación")
+  provider   String   @default("openai")
+  model      String   @default("")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  profile  Profile? @relation(fields: [profile_id], references: [id], onDelete: SetNull)
+  messages Message[]
+  scripts  Script[]
+
+  @@index([user_id, updated_at])
+}
+
+// ---------------------------------------------------------------------------
+// MESSAGES: mensajes en formato UIMessage del AI SDK (parts en JSON string)
+// ---------------------------------------------------------------------------
+
+model Message {
+  id              String   @id
+  conversation_id String
+  user_id         String
+  role            String
+  parts           String   @default("[]")
+  position        Int      @default(0)
+  created_at      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id, position, created_at])
+}
+
+// ---------------------------------------------------------------------------
+// SCRIPTS: guiones guardados + prompts de imagen (JSON string)
+// ---------------------------------------------------------------------------
+
+model Script {
+  id              String   @id @default(uuid())
+  user_id         String
+  conversation_id String?
+  profile_id      String?
+  title           String
+  content         String
+  image_prompts   String   @default("[]")
+  created_at      DateTime @default(now())
+
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversation_id], references: [id], onDelete: SetNull)
+  profile      Profile?      @relation(fields: [profile_id], references: [id], onDelete: SetNull)
+  voiceovers   Voiceover[]
+
+  @@index([user_id, created_at])
+}
+
+// ---------------------------------------------------------------------------
+// CUSTOM_PROVIDERS: endpoints propios compatibles con la API de OpenAI.
+// Se referencian como "custom:<uuid>" en api_keys.provider,
+// conversations.provider, settings.default_provider y custom_models.provider.
+// ---------------------------------------------------------------------------
+
+model CustomProvider {
+  id            String   @id @default(uuid())
+  user_id       String
+  name          String
+  base_url      String
+  default_model String   @default("")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, name])
+  @@index([user_id])
+}
+
+// ---------------------------------------------------------------------------
+// CUSTOM_MODELS: modelos añadidos a mano a cualquier proveedor
+// ---------------------------------------------------------------------------
+
+model CustomModel {
+  id         String   @id @default(uuid())
+  user_id    String
+  provider   String
+  model      String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, provider, model])
+  @@index([user_id, provider])
+}
+
+// ---------------------------------------------------------------------------
+// VOICEOVERS: audios generados a partir de un guion con Vibi (api.vibi.pro)
+// ---------------------------------------------------------------------------
+
+model Voiceover {
+  id              String   @id @default(uuid())
+  user_id         String
+  script_id       String?
+  task_id         String   @unique
+  provider        String   @default("elevenlabs")
+  voice_id        String
+  model_id        String   @default("")
+  language_code   String   @default("")
+  status          String   @default("pending")
+  progress        Int      @default(0)
+  audio_url       String?
+  error           String?
+  text            String   @default("")
+  voice_settings  String   @default("{}")
+  characters_used Int?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user   User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  script Script? @relation(fields: [script_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([script_id, created_at])
+}

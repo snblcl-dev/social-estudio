@@ -1,53 +1,47 @@
 import "server-only";
 
-import { createClient } from "@/lib/supabase/server";
+import { parseJson, prisma, serializeDates } from "@/lib/db";
 import type { Conversation, MessageRow } from "@/lib/types";
 
 export async function listConversations(
   userId: string,
   limit = 30,
 ): Promise<Conversation[]> {
-  const supabase = await createClient();
+  const rows = await prisma.conversation.findMany({
+    where: { user_id: userId },
+    orderBy: { updated_at: "desc" },
+    take: limit,
+  });
 
-  const { data } = await supabase
-    .from("conversations")
-    .select("*")
-    .eq("user_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(limit);
-
-  return (data as Conversation[] | null) ?? [];
+  return serializeDates(rows) as Conversation[];
 }
 
 export async function getConversation(
   userId: string,
   id: string,
 ): Promise<Conversation | null> {
-  const supabase = await createClient();
+  const row = await prisma.conversation.findFirst({
+    where: { id, user_id: userId },
+  });
 
-  const { data } = await supabase
-    .from("conversations")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("id", id)
-    .maybeSingle();
-
-  return (data as Conversation | null) ?? null;
+  return row ? (serializeDates(row) as Conversation) : null;
 }
 
 export async function listMessages(
   userId: string,
   conversationId: string,
 ): Promise<MessageRow[]> {
-  const supabase = await createClient();
+  const rows = await prisma.message.findMany({
+    where: { user_id: userId, conversation_id: conversationId },
+    orderBy: [{ position: "asc" }, { created_at: "asc" }],
+  });
 
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("conversation_id", conversationId)
-    .order("position", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  return (data as MessageRow[] | null) ?? [];
+  return rows.map((row) => ({
+    id: row.id,
+    conversation_id: row.conversation_id,
+    user_id: row.user_id,
+    role: row.role as MessageRow["role"],
+    parts: parseJson<unknown[]>(row.parts, []),
+    created_at: row.created_at.toISOString(),
+  }));
 }

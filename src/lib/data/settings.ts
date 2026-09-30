@@ -1,20 +1,19 @@
 import "server-only";
 
 import { decryptSecret, maskSecret } from "@/lib/crypto";
-import { createClient } from "@/lib/supabase/server";
+import { prisma, serializeDates } from "@/lib/db";
 import type { ApiKeyRow, ApiKeySummary, ProviderKey, UserSettings } from "@/lib/types";
 
 export async function getSettings(userId: string): Promise<UserSettings> {
-  const supabase = await createClient();
+  const row = await prisma.settings.findUnique({ where: { user_id: userId } });
 
-  const { data } = await supabase
-    .from("settings")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (data) {
-    return data as UserSettings;
+  if (row) {
+    return {
+      user_id: row.user_id,
+      default_provider: row.default_provider as ProviderKey,
+      default_model: row.default_model,
+      updated_at: row.updated_at.toISOString(),
+    };
   }
 
   return {
@@ -29,28 +28,20 @@ export async function getApiKeyRow(
   userId: string,
   provider: ProviderKey,
 ): Promise<ApiKeyRow | null> {
-  const supabase = await createClient();
+  const row = await prisma.apiKey.findFirst({
+    where: { user_id: userId, provider },
+  });
 
-  const { data } = await supabase
-    .from("api_keys")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("provider", provider)
-    .maybeSingle();
-
-  return (data as ApiKeyRow | null) ?? null;
+  return row ? (serializeDates(row) as ApiKeyRow) : null;
 }
 
 export async function listApiKeyRows(userId: string): Promise<ApiKeyRow[]> {
-  const supabase = await createClient();
+  const rows = await prisma.apiKey.findMany({
+    where: { user_id: userId },
+    orderBy: { provider: "asc" },
+  });
 
-  const { data } = await supabase
-    .from("api_keys")
-    .select("*")
-    .eq("user_id", userId)
-    .order("provider", { ascending: true });
-
-  return (data as ApiKeyRow[] | null) ?? [];
+  return serializeDates(rows) as ApiKeyRow[];
 }
 
 export async function listConfiguredProviders(userId: string): Promise<ProviderKey[]> {
