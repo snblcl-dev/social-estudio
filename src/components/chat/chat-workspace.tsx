@@ -30,7 +30,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   ATTACHMENT_ACCEPT,
+  JPEG_QUALITY,
   MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_MESSAGE,
+  MAX_IMAGE_DIMENSION,
+  MAX_MESSAGE_ATTACHMENT_BYTES,
   formatBytes,
   isImageMediaType,
   isSupportedAttachment,
@@ -98,7 +102,7 @@ interface MessageFile {
   url: string;
 }
 
-const MAX_IMAGE_DIMENSION = 1568;
+const PNG_KEEP_MAX_BYTES = 1.5 * 1024 * 1024;
 
 function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -119,6 +123,13 @@ function loadImageElement(src: string): Promise<HTMLImageElement> {
   });
 }
 
+/** Longitud aproximada en bytes del contenido de una data URL. */
+function dataUrlByteLength(dataUrl: string): number {
+  const comma = dataUrl.indexOf(",");
+  const body = comma === -1 ? dataUrl : dataUrl.slice(comma + 1);
+  return Math.floor((body.length * 3) / 4);
+}
+
 /** Reduce imágenes grandes en el navegador antes de enviarlas. */
 async function prepareImage(file: File): Promise<{ url: string; mediaType: string }> {
   const dataUrl = await fileToDataUrl(file);
@@ -129,8 +140,10 @@ async function prepareImage(file: File): Promise<{ url: string; mediaType: strin
   try {
     const image = await loadImageElement(dataUrl);
     const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.width, image.height));
+    const needsResize = scale < 1;
 
-    if (scale === 1 && file.size <= 2 * 1024 * 1024) {
+    // Imagen ya pequeña: se envía sin recomprimir.
+    if (!needsResize && file.size <= 1024 * 1024) {
       return { url: dataUrl, mediaType: file.type };
     }
 
@@ -143,8 +156,19 @@ async function prepareImage(file: File): Promise<{ url: string; mediaType: strin
 
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
 
-    const mediaType = file.type === "image/png" ? "image/png" : "image/jpeg";
-    return { url: canvas.toDataURL(mediaType, 0.85), mediaType };
+    // Un PNG solo se conserva si el resultado no es demasiado pesado (así
+    // las capturas con texto quedan nítidas); si no, se pasa a JPEG.
+    if (file.type === "image/png") {
+      const png = canvas.toDataURL("image/png");
+      if (dataUrlByteLength(png) <= PNG_KEEP_MAX_BYTES) {
+        return { url: png, mediaType: "image/png" };
+      }
+    }
+
+    return {
+      url: canvas.toDataURL("image/jpeg", JPEG_QUALITY),
+      mediaType: "image/jpeg",
+    };
   } catch {
     return { url: dataUrl, mediaType: file.type };
   }
@@ -282,12 +306,25 @@ export function ChatWorkspace({
     event.target.value = "";
     if (selected.length === 0) return;
 
+    const available = MAX_ATTACHMENTS_PER_MESSAGE - attachments.length;
+    if (available <= 0) {
+      toast.error(`Máximo ${MAX_ATTACHMENTS_PER_MESSAGE} adjuntos por mensaje.`);
+      return;
+    }
+
+    const accepted = selected.slice(0, available);
+    if (selected.length > available) {
+      toast.error(
+        `Solo se añadieron ${available}: máximo ${MAX_ATTACHMENTS_PER_MESSAGE} adjuntos por mensaje.`,
+      );
+    }
+
     setIsPreparingFiles(true);
 
     try {
       const prepared: PendingAttachment[] = [];
 
-      for (const file of selected) {
+      for (const file of accepted) {
         if (!isSupportedAttachment(file)) {
           toast.error(`Tipo de archivo no admitido: ${file.name}`);
           continue;
@@ -339,6 +376,18 @@ export function ChatWorkspace({
     }));
 
     if ((!text && files.length === 0) || isBusy || isPreparingFiles) return;
+
+    const totalAttachmentBytes = attachments.reduce(
+      (sum, item) => sum + dataUrlByteLength(item.url),
+      0,
+    );
+
+    if (totalAttachmentBytes > MAX_MESSAGE_ATTACHMENT_BYTES) {
+      toast.error(
+        `Los adjuntos pesan ${formatBytes(totalAttachmentBytes)}; el máximo por mensaje es ${formatBytes(MAX_MESSAGE_ATTACHMENT_BYTES)}.`,
+      );
+      return;
+    }
 
     setInput("");
     setAttachments([]);

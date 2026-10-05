@@ -1,6 +1,18 @@
 /** Tamaño máximo por adjunto. */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
+/** Máximo de adjuntos por mensaje (para no exceder límites del proveedor). */
+export const MAX_ATTACHMENTS_PER_MESSAGE = 20;
+
+/** Tamaño total máximo de los adjuntos de un mensaje, ya comprimidos. */
+export const MAX_MESSAGE_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+/** Lado mayor al que se reducen las imágenes antes de enviarlas. */
+export const MAX_IMAGE_DIMENSION = 1568;
+
+/** Calidad JPEG al recomprimir imágenes. */
+export const JPEG_QUALITY = 0.9;
+
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 const TEXT_TYPES = ["text/plain", "text/markdown", "text/csv"];

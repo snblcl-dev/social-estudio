@@ -159,6 +159,34 @@ function extractText(message: UIMessage) {
     .trim();
 }
 
+/**
+ * Conserva las partes `file` solo del último mensaje del usuario que tenga
+ * adjuntos; el resto se envían sin archivos. Evita reenviar al modelo todas
+ * las imágenes/PDF del historial en cada turno.
+ */
+function keepRecentAttachments(messages: UIMessage[]): UIMessage[] {
+  let lastWithFiles = -1;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "user" && message.parts.some((part) => part.type === "file")) {
+      lastWithFiles = index;
+      break;
+    }
+  }
+
+  if (lastWithFiles === -1) return messages;
+
+  return messages.map((message, index) =>
+    index === lastWithFiles
+      ? message
+      : {
+          ...message,
+          parts: message.parts.filter((part) => part.type !== "file"),
+        },
+  );
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
 
@@ -213,9 +241,11 @@ export async function POST(request: Request) {
       model: languageModel,
       instructions: buildInstructions(profile),
       // El razonamiento se guarda en el historial, pero no se reenvía al
-      // modelo: evita errores de firmas y ahorra tokens.
+      // modelo (evita errores de firmas y ahorra tokens). Además solo se
+      // adjuntan los archivos del último mensaje del usuario que los tenga,
+      // para no reenviar todas las imágenes/PDF del historial en cada turno.
       messages: pruneMessages({
-        messages: await convertToModelMessages(messages),
+        messages: await convertToModelMessages(keepRecentAttachments(messages)),
         reasoning: "all",
       }),
       reasoning,
