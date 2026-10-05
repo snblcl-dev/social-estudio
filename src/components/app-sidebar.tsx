@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
+  ChevronsUpDownIcon,
   FileTextIcon,
   FolderIcon,
   FolderPlusIcon,
   Loader2Icon,
   LogOutIcon,
-  MessagesSquareIcon,
+  MenuIcon,
   MoreHorizontalIcon,
   PencilIcon,
   SettingsIcon,
@@ -57,18 +58,12 @@ import { Label } from "@/components/ui/label";
 import type { Conversation, Project } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
-  { href: "/", label: "Chat", icon: MessagesSquareIcon },
+const OPTIONS_LINKS = [
   { href: "/perfiles", label: "Perfiles", icon: UsersIcon },
   { href: "/perfiles-video", label: "Perfiles de video", icon: VideoIcon },
-  { href: "/ajustes", label: "Ajustes", icon: SettingsIcon },
   { href: "/guiones", label: "Guiones", icon: FileTextIcon },
+  { href: "/ajustes", label: "Ajustes", icon: SettingsIcon },
 ];
-
-function isLinkActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -121,7 +116,7 @@ function ConversationItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Mover a</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>Mover a proyecto</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 <DropdownMenuItem onClick={() => onMove(conversation.id, null)}>
                   Sin proyecto
@@ -170,13 +165,11 @@ export function AppSidebar({
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const activeId = pathname === "/" ? (searchParams.get("c") ?? undefined) : undefined;
-  const showConversations = pathname === "/";
+  const showConversations = pathname === "/" || pathname.startsWith("/proyectos");
 
+  // Las conversaciones dentro de proyectos no se listan aquí: se ven al
+  // entrar al proyecto. Solo se listan las que no tienen proyecto.
   const ungrouped = conversations.filter((conversation) => !conversation.project_id);
-  const groups = projects.map((project) => ({
-    project,
-    items: conversations.filter((conversation) => conversation.project_id === project.id),
-  }));
 
   function handleDelete(id: string) {
     setPendingId(id);
@@ -248,9 +241,10 @@ export function AppSidebar({
     if (!projectToDelete) return;
     const id = projectToDelete.id;
 
-    const removedActive = conversations.some(
+    const removedActiveConversation = conversations.some(
       (conversation) => conversation.project_id === id && conversation.id === activeId,
     );
+    const removedActiveProject = pathname === `/proyectos/${id}`;
 
     startTransition(async () => {
       const result = await deleteProject(id);
@@ -263,25 +257,13 @@ export function AppSidebar({
       toast.success("Proyecto eliminado.");
       setProjectToDelete(null);
 
-      if (removedActive) {
+      if (removedActiveConversation || removedActiveProject) {
         router.push("/");
       } else {
         router.refresh();
       }
     });
   }
-
-  const renderItem = (conversation: Conversation) => (
-    <ConversationItem
-      key={conversation.id}
-      conversation={conversation}
-      isActive={conversation.id === activeId}
-      isPending={pendingId === conversation.id}
-      projects={projects}
-      onDelete={handleDelete}
-      onMove={handleMove}
-    />
-  );
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border/60 bg-sidebar/60 backdrop-blur-xl">
@@ -319,48 +301,53 @@ export function AppSidebar({
                 </p>
               ) : (
                 <div className="flex flex-col gap-1">
-                  {groups.map(({ project, items }) => (
-                    <div key={project.id} className="flex flex-col">
-                      <div className="flex items-center gap-1 px-2 pt-3 pb-1">
-                        <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 truncate text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                          {project.name}
-                        </span>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            aria-label={`Opciones de ${project.name}`}
-                          >
-                            <MoreHorizontalIcon className="size-3.5" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openRenameProject(project)}>
-                              <PencilIcon />
-                              Renombrar
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => setProjectToDelete(project)}
-                            >
-                              <Trash2Icon />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                  {projects.length > 0 ? (
+                    <ul className="flex flex-col gap-0.5">
+                      {projects.map((project) => {
+                        const isProjectActive = pathname === `/proyectos/${project.id}`;
 
-                      <ul className="flex flex-col gap-0.5">
-                        {items.length === 0 ? (
-                          <li className="px-2.5 py-1 text-xs text-muted-foreground">
-                            Sin conversaciones
+                        return (
+                          <li key={project.id} className="group/project relative">
+                            <Link
+                              href={`/proyectos/${project.id}`}
+                              className={cn(
+                                "flex items-center gap-2 rounded-lg border-l-2 border-transparent py-2 pr-8 pl-2.5 text-sm transition-colors hover:bg-muted",
+                                isProjectActive && "border-primary bg-primary/10 text-primary",
+                              )}
+                            >
+                              <FolderIcon className="size-4 shrink-0" />
+                              <span className="line-clamp-1 flex-1">{project.name}</span>
+                            </Link>
+
+                            <div className="absolute top-1.5 right-1 opacity-0 transition-opacity group-hover/project:opacity-100">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger
+                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  aria-label={`Opciones de ${project.name}`}
+                                >
+                                  <MoreHorizontalIcon className="size-3.5" />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openRenameProject(project)}>
+                                    <PencilIcon />
+                                    Renombrar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => setProjectToDelete(project)}
+                                  >
+                                    <Trash2Icon />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </li>
-                        ) : (
-                          items.map(renderItem)
-                        )}
-                      </ul>
-                    </div>
-                  ))}
+                        );
+                      })}
+                    </ul>
+                  ) : null}
 
                   {ungrouped.length > 0 ? (
                     <div className="flex flex-col">
@@ -370,7 +357,19 @@ export function AppSidebar({
                           Sin proyecto
                         </span>
                       </div>
-                      <ul className="flex flex-col gap-0.5">{ungrouped.map(renderItem)}</ul>
+                      <ul className="flex flex-col gap-0.5">
+                        {ungrouped.map((conversation) => (
+                          <ConversationItem
+                            key={conversation.id}
+                            conversation={conversation}
+                            isActive={conversation.id === activeId}
+                            isPending={pendingId === conversation.id}
+                            projects={projects}
+                            onDelete={handleDelete}
+                            onMove={handleMove}
+                          />
+                        ))}
+                      </ul>
                     </div>
                   ) : null}
                 </div>
@@ -380,40 +379,40 @@ export function AppSidebar({
         ) : null}
       </div>
 
-      <nav className="flex flex-col gap-1 border-t border-border/60 p-3">
-        {LINKS.map((link) => {
-          const isActive = isLinkActive(pathname, link.href);
-          const Icon = link.icon;
+      <div className="border-t border-border/60 p-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <MenuIcon className="size-4" />
+            Opciones
+            <ChevronsUpDownIcon className="ml-auto size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            {OPTIONS_LINKS.map((link) => {
+              const Icon = link.icon;
 
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                isActive
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
+              return (
+                <DropdownMenuItem
+                  key={link.href}
+                  onClick={() => router.push(link.href)}
+                >
+                  <Icon />
+                  {link.label}
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => {
+                void signOut();
+              }}
             >
-              <Icon className="size-4" />
-              {link.label}
-            </Link>
-          );
-        })}
-
-        <form action={signOut}>
-          <Button
-            variant="ghost"
-            type="submit"
-            className="w-full cursor-pointer justify-start text-muted-foreground hover:text-foreground"
-          >
-            <LogOutIcon />
-            Salir
-          </Button>
-        </form>
-      </nav>
+              <LogOutIcon />
+              Salir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
         <DialogContent className="sm:max-w-sm">

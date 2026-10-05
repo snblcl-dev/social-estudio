@@ -16,6 +16,20 @@ export async function listConversations(
   return serializeDates(rows) as Conversation[];
 }
 
+export async function listConversationsByProject(
+  userId: string,
+  projectId: string,
+  limit = 200,
+): Promise<Conversation[]> {
+  const rows = await prisma.conversation.findMany({
+    where: { user_id: userId, project_id: projectId },
+    orderBy: { updated_at: "desc" },
+    take: limit,
+  });
+
+  return serializeDates(rows) as Conversation[];
+}
+
 export async function getConversation(
   userId: string,
   id: string,
