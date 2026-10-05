@@ -8,14 +8,17 @@ import Link from "next/link";
 import {
   BotIcon,
   ChevronRightIcon,
+  FileTextIcon,
   ImageIcon,
   Loader2Icon,
+  PaperclipIcon,
   SaveIcon,
   SendIcon,
   Settings2Icon,
   SparklesIcon,
   SquareIcon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +28,14 @@ import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  ATTACHMENT_ACCEPT,
+  MAX_ATTACHMENT_BYTES,
+  formatBytes,
+  isImageMediaType,
+  isSupportedAttachment,
+  normalizeMediaType,
+} from "@/lib/attachments";
 import { REASONING_EFFORT_OPTIONS } from "@/lib/reasoning";
 import type {
   Conversation,
@@ -70,6 +81,84 @@ function ReasoningBlock({ text }: { text: string }) {
   );
 }
 
+interface PendingAttachment {
+  id: string;
+  filename: string;
+  mediaType: string;
+  size: number;
+  /** Data URL que se envía al modelo y se persiste. */
+  url: string;
+  /** Vista previa para imágenes (mismo data URL). */
+  previewUrl: string | null;
+}
+
+interface MessageFile {
+  mediaType: string;
+  filename?: string;
+  url: string;
+}
+
+const MAX_IMAGE_DIMENSION = 1568;
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("No se pudo leer el archivo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("No se pudo procesar la imagen."));
+    image.src = src;
+  });
+}
+
+/** Reduce imágenes grandes en el navegador antes de enviarlas. */
+async function prepareImage(file: File): Promise<{ url: string; mediaType: string }> {
+  const dataUrl = await fileToDataUrl(file);
+
+  // Los GIF pueden ser animados: no se re-codifican.
+  if (file.type === "image/gif") return { url: dataUrl, mediaType: file.type };
+
+  try {
+    const image = await loadImageElement(dataUrl);
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(image.width, image.height));
+
+    if (scale === 1 && file.size <= 2 * 1024 * 1024) {
+      return { url: dataUrl, mediaType: file.type };
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+
+    const context = canvas.getContext("2d");
+    if (!context) return { url: dataUrl, mediaType: file.type };
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const mediaType = file.type === "image/png" ? "image/png" : "image/jpeg";
+    return { url: canvas.toDataURL(mediaType, 0.85), mediaType };
+  } catch {
+    return { url: dataUrl, mediaType: file.type };
+  }
+}
+
+function filesOf(message: UIMessage): MessageFile[] {
+  return message.parts
+    .filter((part) => part.type === "file")
+    .map((part) => {
+      const file = part as { mediaType: string; filename?: string; url: string };
+      return { mediaType: file.mediaType, filename: file.filename, url: file.url };
+    });
+}
+
 export function ChatWorkspace({
   conversation,
   profiles,
@@ -92,9 +181,12 @@ export function ChatWorkspace({
   );
   const [isSavingScript, setIsSavingScript] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [isPreparingFiles, setIsPreparingFiles] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const savedSignatureRef = useRef(
     `${initial.length}:${initial[initial.length - 1]?.id ?? ""}`,
   );
@@ -181,28 +273,90 @@ export function ChatWorkspace({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  function handleAttachClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (selected.length === 0) return;
+
+    setIsPreparingFiles(true);
+
+    try {
+      const prepared: PendingAttachment[] = [];
+
+      for (const file of selected) {
+        if (!isSupportedAttachment(file)) {
+          toast.error(`Tipo de archivo no admitido: ${file.name}`);
+          continue;
+        }
+
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          toast.error(
+            `${file.name} supera el límite de ${formatBytes(MAX_ATTACHMENT_BYTES)}.`,
+          );
+          continue;
+        }
+
+        const mediaType = normalizeMediaType(file);
+        const isImage = isImageMediaType(mediaType);
+        const result = isImage
+          ? await prepareImage(file)
+          : { url: await fileToDataUrl(file), mediaType };
+
+        prepared.push({
+          id: crypto.randomUUID(),
+          filename: file.name,
+          mediaType: result.mediaType,
+          size: file.size,
+          url: result.url,
+          previewUrl: isImage ? result.url : null,
+        });
+      }
+
+      setAttachments((current) => [...current, ...prepared]);
+    } catch {
+      toast.error("No se pudieron preparar los adjuntos.");
+    } finally {
+      setIsPreparingFiles(false);
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((current) => current.filter((item) => item.id !== id));
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const text = input.trim();
+    const files = attachments.map((item) => ({
+      type: "file" as const,
+      mediaType: item.mediaType,
+      filename: item.filename,
+      url: item.url,
+    }));
 
-    if (!text || isBusy) return;
+    if ((!text && files.length === 0) || isBusy || isPreparingFiles) return;
 
     setInput("");
+    setAttachments([]);
     clearError();
 
+    const message =
+      files.length > 0 ? (text ? { text, files } : { files }) : { text };
+
     try {
-      await sendMessage(
-        { text },
-        {
-          body: {
-            conversationId: conversation.id,
-            profileId: profileId || null,
-            provider,
-            model,
-            reasoning: reasoningEffort,
-          },
+      await sendMessage(message, {
+        body: {
+          conversationId: conversation.id,
+          profileId: profileId || null,
+          provider,
+          model,
+          reasoning: reasoningEffort,
         },
-      );
+      });
     } catch (sendError) {
       toast.error(
         sendError instanceof Error ? sendError.message : "No se pudo enviar el mensaje.",
@@ -322,8 +476,11 @@ export function ChatWorkspace({
               const text = textOf(message);
               const isUser = message.role === "user";
               const reasoning = isUser ? "" : reasoningOf(message);
+              const files = filesOf(message);
 
-              if (!text && !(showReasoning && reasoning)) return null;
+              if (!text && files.length === 0 && !(showReasoning && reasoning)) {
+                return null;
+              }
 
               return (
                 <div
@@ -351,6 +508,38 @@ export function ChatWorkspace({
                     )}
                   >
                     {showReasoning && reasoning ? <ReasoningBlock text={reasoning} /> : null}
+                    {files.length > 0 ? (
+                      <div
+                        className={cn(
+                          "flex max-w-full flex-wrap gap-2",
+                          isUser ? "justify-end" : "justify-start",
+                        )}
+                      >
+                        {files.map((file, index) =>
+                          isImageMediaType(file.mediaType) ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={index}
+                              src={file.url}
+                              alt={file.filename ?? "adjunto"}
+                              className="max-h-48 rounded-xl border border-border/60 object-contain"
+                            />
+                          ) : (
+                            <a
+                              key={index}
+                              href={file.url}
+                              download={file.filename}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2.5 py-1.5 text-xs"
+                            >
+                              <FileTextIcon className="size-3.5" />
+                              {file.filename ?? file.mediaType}
+                            </a>
+                          ),
+                        )}
+                      </div>
+                    ) : null}
                     {text ? (
                       <div
                         className={cn(
@@ -396,6 +585,51 @@ export function ChatWorkspace({
         onSubmit={handleSubmit}
         className="flex flex-col gap-2 rounded-xl border border-border/60 bg-card/50 p-3 backdrop-blur-sm"
       >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ATTACHMENT_ACCEPT}
+          className="hidden"
+          onChange={handleFilesSelected}
+        />
+
+        {attachments.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((item) => (
+              <div
+                key={item.id}
+                className="relative flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 py-1.5 pr-7 pl-1.5 text-xs"
+              >
+                {item.previewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.previewUrl}
+                    alt={item.filename}
+                    className="size-9 rounded object-cover"
+                  />
+                ) : (
+                  <span className="flex size-8 items-center justify-center rounded bg-primary/10 text-primary">
+                    <FileTextIcon className="size-4" />
+                  </span>
+                )}
+                <span className="flex flex-col">
+                  <span className="max-w-[12rem] truncate">{item.filename}</span>
+                  <span className="text-muted-foreground">{formatBytes(item.size)}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(item.id)}
+                  aria-label={`Quitar ${item.filename}`}
+                  className="absolute top-1 right-1 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <textarea
           value={input}
           onChange={(event) => setInput(event.target.value)}
@@ -412,7 +646,25 @@ export function ChatWorkspace({
         />
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" disabled={isBusy || input.trim().length === 0}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAttachClick}
+            disabled={isBusy || isPreparingFiles}
+            title="Adjuntar imágenes, PDF o texto"
+          >
+            {isPreparingFiles ? <Loader2Icon className="animate-spin" /> : <PaperclipIcon />}
+            Adjuntar
+          </Button>
+
+          <Button
+            type="submit"
+            disabled={
+              isBusy ||
+              isPreparingFiles ||
+              (input.trim().length === 0 && attachments.length === 0)
+            }
+          >
             {isBusy ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
             Enviar
           </Button>
