@@ -30,14 +30,28 @@ export interface ProviderInfo {
   openaiCompatible?: boolean;
 }
 
+/** Tipo de perfil: guion + imagen, o solo prompts de video. */
+export type ProfileType = "script" | "video";
+
 export interface Profile {
   id: string;
   user_id: string;
+  type: ProfileType;
   name: string;
   description: string | null;
   script_instructions: string;
   theme_instructions: string;
   image_prompt_instructions: string;
+  video_prompt_instructions: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Carpeta con nombre para agrupar conversaciones. */
+export interface Project {
+  id: string;
+  user_id: string;
+  name: string;
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +86,8 @@ export interface Conversation {
   id: string;
   user_id: string;
   profile_id: string | null;
+  video_profile_id: string | null;
+  project_id: string | null;
   title: string;
   provider: ProviderKey;
   model: string;

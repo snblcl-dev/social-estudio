@@ -2,18 +2,18 @@ import { ProfilesManager } from "@/components/profiles/profiles-manager";
 import { listProfiles } from "@/lib/data/profiles";
 import { getCurrentUser } from "@/lib/session";
 
-export default async function ProfilesPage() {
+export default async function VideoProfilesPage() {
   const user = await getCurrentUser();
 
   if (!user) {
     return null;
   }
 
-  const profiles = await listProfiles(user.id, "script");
+  const profiles = await listProfiles(user.id, "video");
 
   return (
     <div className="flex-1 overflow-y-auto p-6">
-      <ProfilesManager profiles={profiles} type="script" />
+      <ProfilesManager profiles={profiles} type="video" />
     </div>
   );
 }

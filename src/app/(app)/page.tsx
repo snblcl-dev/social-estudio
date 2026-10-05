@@ -5,6 +5,7 @@ import { NewConversationForm } from "@/components/chat/new-conversation-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getConversation, listMessages } from "@/lib/data/conversations";
 import { listProfiles } from "@/lib/data/profiles";
+import { listProjects } from "@/lib/data/projects";
 import { getSettings, listConfiguredProviders } from "@/lib/data/settings";
 import { isProviderKey } from "@/lib/providers";
 import { listProviderOptions } from "@/lib/providers-server";
@@ -24,12 +25,15 @@ export default async function ChatPage({
 
   const { c } = await searchParams;
 
-  const [profiles, settings, configuredProviders, providerOptions] = await Promise.all([
-    listProfiles(user.id),
-    getSettings(user.id),
-    listConfiguredProviders(user.id),
-    listProviderOptions(user.id),
-  ]);
+  const [profiles, videoProfiles, settings, configuredProviders, providerOptions, projects] =
+    await Promise.all([
+      listProfiles(user.id, "script"),
+      listProfiles(user.id, "video"),
+      getSettings(user.id),
+      listConfiguredProviders(user.id),
+      listProviderOptions(user.id),
+      listProjects(user.id),
+    ]);
 
   const defaultProvider: ProviderKey = isProviderKey(settings.default_provider)
     ? settings.default_provider
@@ -65,6 +69,7 @@ export default async function ChatPage({
           <CardContent>
             <NewConversationForm
               profiles={profiles}
+              projects={projects}
               providerOptions={providerOptions}
               configuredProviders={configuredProviders}
               defaultProvider={defaultProvider}
@@ -82,6 +87,7 @@ export default async function ChatPage({
         key={conversation.id}
         conversation={conversation}
         profiles={profiles}
+        videoProfiles={videoProfiles}
         providerOptions={providerOptions}
         initialMessages={initialMessages}
       />

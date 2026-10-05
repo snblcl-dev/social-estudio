@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listConversations } from "@/lib/data/conversations";
+import { listProjects } from "@/lib/data/projects";
 import { isAuthConfigured } from "@/lib/env";
 import { getCurrentUser } from "@/lib/session";
 
@@ -38,12 +39,15 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect("/login");
   }
 
-  const conversations = await listConversations(user.id);
+  const [conversations, projects] = await Promise.all([
+    listConversations(user.id),
+    listProjects(user.id),
+  ]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
       <Suspense fallback={<div className="w-64 shrink-0 border-r border-border/60 bg-sidebar/60" />}>
-        <AppSidebar conversations={conversations} />
+        <AppSidebar conversations={conversations} projects={projects} />
       </Suspense>
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {children}

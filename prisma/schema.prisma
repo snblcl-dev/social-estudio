@@ -36,6 +36,7 @@ model User {
   customProviders CustomProvider[]
   customModels    CustomModel[]
   voiceovers      Voiceover[]
+  projects        Project[]
 }
 
 model Session {
@@ -89,19 +90,23 @@ model Verification {
 model Profile {
   id                        String   @id @default(uuid())
   user_id                   String
+  // "script" = guion + prompts de imagen; "video" = solo prompts de video.
+  type                      String   @default("script")
   name                      String
   description               String   @default("")
   script_instructions       String   @default("")
   theme_instructions        String   @default("")
   image_prompt_instructions String   @default("")
+  video_prompt_instructions String   @default("")
   created_at                DateTime @default(now())
   updated_at                DateTime @updatedAt
 
-  user          User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  conversations Conversation[]
-  scripts       Script[]
+  user               User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversations      Conversation[] @relation("ConversationScriptProfile")
+  videoConversations Conversation[] @relation("ConversationVideoProfile")
+  scripts            Script[]
 
-  @@index([user_id, name])
+  @@index([user_id, type, name])
 }
 
 // ---------------------------------------------------------------------------
@@ -144,6 +149,8 @@ model Conversation {
   id               String   @id @default(uuid())
   user_id          String
   profile_id       String?
+  video_profile_id String?
+  project_id       String?
   title            String   @default("Nueva conversación")
   provider         String   @default("openai")
   model            String   @default("")
@@ -152,12 +159,33 @@ model Conversation {
   created_at       DateTime @default(now())
   updated_at       DateTime @updatedAt
 
-  user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  profile  Profile? @relation(fields: [profile_id], references: [id], onDelete: SetNull)
-  messages Message[]
-  scripts  Script[]
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  profile      Profile? @relation("ConversationScriptProfile", fields: [profile_id], references: [id], onDelete: SetNull)
+  videoProfile Profile? @relation("ConversationVideoProfile", fields: [video_profile_id], references: [id], onDelete: SetNull)
+  project      Project? @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  messages     Message[]
+  scripts      Script[]
 
   @@index([user_id, updated_at])
+  @@index([project_id, updated_at])
+}
+
+// ---------------------------------------------------------------------------
+// PROJECTS: carpetas con nombre para agrupar conversaciones
+// ---------------------------------------------------------------------------
+
+model Project {
+  id         String   @id @default(uuid())
+  user_id    String
+  name       String
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user          User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([user_id, name])
+  @@index([user_id])
 }
 
 // ---------------------------------------------------------------------------

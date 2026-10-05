@@ -27,10 +27,11 @@ const generateMessageId = createIdGenerator({ prefix: "msg", size: 16 });
 const bodySchema = z.object({
   conversationId: z.string().uuid("Conversación inválida."),
   profileId: z.string().uuid().nullable().optional(),
+  videoProfileId: z.string().uuid().nullable().optional(),
   provider: z.string(),
   model: z.string(),
   reasoning: z.enum(REASONING_EFFORT_VALUES).optional(),
-  mode: z.enum(["chat", "image-prompts"]).optional(),
+  mode: z.enum(["chat", "image-prompts", "video-prompts"]).optional(),
 });
 
 const BASE_INSTRUCTIONS = `Eres un guionista experto en contenido para redes sociales.
@@ -53,6 +54,23 @@ Responde con una lista numerada, un prompt por escena, con este formato:
 
 **Escena 2 — <título breve>**
 <prompt de imagen>
+
+Sé conciso: una o dos frases por prompt, sin repetir información entre escenas.`;
+
+const BASE_VIDEO_INSTRUCTIONS = `## Prompts de video
+Cuando el usuario pida los prompts de video (o prompts para animar las imágenes/contenido), actúa como
+director y guionista de video para redes sociales. A partir de las imágenes y del contenido de la
+conversación, escribe los prompts de video necesarios para ilustrarlo, en el mismo idioma del contenido.
+Cada prompt debe ser una descripción autosuficiente y lista para pegar en un generador de video, e incluir
+sujeto, acción, entorno, movimiento de cámara, iluminación, ritmo y duración sugerida, y estilo visual.
+No incluyas texto, marcas de agua ni logotipos en la descripción.
+Responde con una lista numerada, un prompt por escena, con este formato:
+
+**Escena 1 — <título breve>**
+<prompt de video>
+
+**Escena 2 — <título breve>**
+<prompt de video>
 
 Sé conciso: una o dos frases por prompt, sin repetir información entre escenas.`;
 
@@ -93,6 +111,28 @@ function buildInstructions(profile: Profile | null) {
   } else {
     blocks.push(
       "No hay instrucciones de prompts de imagen en el perfil: usa un estilo cinematográfico realista y genera entre 3 y 6 escenas.",
+    );
+  }
+
+  return blocks.join("\n\n");
+}
+
+function buildVideoInstructions(videoProfile: Profile | null) {
+  const blocks: string[] = [BASE_VIDEO_INSTRUCTIONS];
+
+  if (videoProfile) {
+    blocks.push(`## Perfil de video activo: ${videoProfile.name}`);
+    if (videoProfile.description) {
+      blocks.push(`Descripción del perfil: ${videoProfile.description}`);
+    }
+    if (videoProfile.video_prompt_instructions) {
+      blocks.push(
+        `## Instrucciones de prompts de video del perfil (prioritarias)\n${videoProfile.video_prompt_instructions}`,
+      );
+    }
+  } else {
+    blocks.push(
+      "No hay un perfil de video activo: usa un estilo cinematográfico realista y genera entre 3 y 6 escenas.",
     );
   }
 
@@ -208,7 +248,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
 
-  const { conversationId, profileId, provider, model, reasoning, mode } = parsed.data;
+  const { conversationId, profileId, videoProfileId, provider, model, reasoning, mode } =
+    parsed.data;
 
   if (!isProviderKey(provider)) {
     return NextResponse.json({ error: "Proveedor inválido." }, { status: 400 });
@@ -221,7 +262,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const profile = profileId ? await getProfile(user.id, profileId) : null;
+    const isVideoMode = mode === "video-prompts";
+    const profile = !isVideoMode && profileId ? await getProfile(user.id, profileId) : null;
+    const videoProfile =
+      isVideoMode && videoProfileId ? await getProfile(user.id, videoProfileId) : null;
     const languageModel = await resolveModelForUser(
       user.id,
       provider as ProviderKey,
@@ -235,11 +279,20 @@ export async function POST(request: Request) {
         perfilEncontrado: Boolean(profile),
         caracteresInstruccionesImagen: profile?.image_prompt_instructions?.trim().length ?? 0,
       });
+    } else if (isVideoMode) {
+      console.log("[api/chat] petición de prompts de video", {
+        videoProfileId: videoProfileId ?? null,
+        perfilEncontrado: Boolean(videoProfile),
+        caracteresInstruccionesVideo:
+          videoProfile?.video_prompt_instructions?.trim().length ?? 0,
+      });
     }
 
     const result = streamText({
       model: languageModel,
-      instructions: buildInstructions(profile),
+      instructions: isVideoMode
+        ? buildVideoInstructions(videoProfile)
+        : buildInstructions(profile),
       // El razonamiento se guarda en el historial, pero no se reenvía al
       // modelo (evita errores de firmas y ahorra tokens). Además solo se
       // adjuntan los archivos del último mensaje del usuario que los tenga,

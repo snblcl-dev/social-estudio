@@ -7,11 +7,13 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
 const profileSchema = z.object({
+  type: z.enum(["script", "video"]).default("script"),
   name: z.string().trim().min(1, "El nombre es obligatorio.").max(80),
   description: z.string().trim().max(300).optional().default(""),
   script_instructions: z.string().trim().max(50000).optional().default(""),
   theme_instructions: z.string().trim().max(50000).optional().default(""),
   image_prompt_instructions: z.string().trim().max(50000).optional().default(""),
+  video_prompt_instructions: z.string().trim().max(50000).optional().default(""),
 });
 
 export type ProfileInput = z.input<typeof profileSchema>;

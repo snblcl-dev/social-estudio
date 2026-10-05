@@ -115,6 +115,8 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
 
 export async function createConversation(input: {
   profileId: string | null;
+  videoProfileId?: string | null;
+  projectId?: string | null;
   provider: string;
   model: string;
   title?: string;
@@ -137,6 +139,8 @@ export async function createConversation(input: {
       data: {
         user_id: user.id,
         profile_id: input.profileId,
+        video_profile_id: input.videoProfileId ?? null,
+        project_id: input.projectId ?? null,
         provider: input.provider,
         model: input.model,
         title: input.title?.trim() || "Nueva conversación",
@@ -157,6 +161,8 @@ export async function updateConversation(input: {
   id: string;
   title?: string;
   profileId?: string | null;
+  videoProfileId?: string | null;
+  projectId?: string | null;
   provider?: string;
   model?: string;
   showReasoning?: boolean;
@@ -169,6 +175,8 @@ export async function updateConversation(input: {
 
   if (typeof input.title === "string") data.title = input.title.trim() || "Sin título";
   if (input.profileId !== undefined) data.profile_id = input.profileId;
+  if (input.videoProfileId !== undefined) data.video_profile_id = input.videoProfileId;
+  if (input.projectId !== undefined) data.project_id = input.projectId;
   if (input.model) data.model = input.model;
   if (typeof input.showReasoning === "boolean") data.show_reasoning = input.showReasoning;
   if (input.reasoningEffort !== undefined) {

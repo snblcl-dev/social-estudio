@@ -18,6 +18,7 @@ import {
   SparklesIcon,
   SquareIcon,
   UserIcon,
+  VideoIcon,
   XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +54,7 @@ import { cn } from "@/lib/utils";
 interface ChatWorkspaceProps {
   conversation: Conversation;
   profiles: Profile[];
+  videoProfiles: Profile[];
   providerOptions: ProviderOption[];
   initialMessages: UIMessage[];
 }
@@ -189,6 +191,7 @@ function filesOf(message: UIMessage): MessageFile[] {
 export function ChatWorkspace({
   conversation,
   profiles,
+  videoProfiles,
   providerOptions,
   initialMessages,
 }: ChatWorkspaceProps) {
@@ -202,6 +205,9 @@ export function ChatWorkspace({
       "",
   );
   const [profileId, setProfileId] = useState(conversation.profile_id ?? "");
+  const [videoProfileId, setVideoProfileId] = useState(
+    conversation.video_profile_id ?? "",
+  );
   const [showReasoning, setShowReasoning] = useState(conversation.show_reasoning);
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
     conversation.reasoning_effort,
@@ -469,6 +475,52 @@ export function ChatWorkspace({
         sendError instanceof Error
           ? sendError.message
           : "No se pudieron generar los prompts.",
+      );
+    } finally {
+      router.refresh();
+    }
+  }
+
+  function handleVideoProfileChange(next: string) {
+    setVideoProfileId(next);
+    void updateConversation({ id: conversation.id, videoProfileId: next || null }).then(
+      (result) => {
+        if (result.error) toast.error(result.error);
+      },
+    );
+  }
+
+  async function handleGenerateVideoPrompts() {
+    if (isBusy) return;
+
+    if (messages.length === 0) {
+      toast.error("Todavía no hay contenido para analizar.");
+      return;
+    }
+
+    clearError();
+
+    try {
+      await sendMessage(
+        {
+          text: "Genera los prompts de video para el contenido o las imágenes anteriores, siguiendo las instrucciones de prompts de video del perfil.",
+        },
+        {
+          body: {
+            conversationId: conversation.id,
+            videoProfileId: videoProfileId || null,
+            provider,
+            model,
+            reasoning: reasoningEffort,
+            mode: "video-prompts",
+          },
+        },
+      );
+    } catch (sendError) {
+      toast.error(
+        sendError instanceof Error
+          ? sendError.message
+          : "No se pudieron generar los prompts de video.",
       );
     } finally {
       router.refresh();
@@ -747,6 +799,17 @@ export function ChatWorkspace({
           <Button
             type="button"
             variant="outline"
+            onClick={handleGenerateVideoPrompts}
+            disabled={isBusy || messages.length === 0}
+            title="Pedir prompts de video al modelo"
+          >
+            <VideoIcon />
+            Prompts de video
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
             onClick={handleSaveScript}
             disabled={isSavingScript || !lastAssistantText}
             title="Guardar la última respuesta en Guiones"
@@ -785,6 +848,28 @@ export function ChatWorkspace({
                     >
                       <option value="">Sin perfil</option>
                       {profiles.map((profile) => (
+                        <option key={profile.id} value={profile.id}>
+                          {profile.name}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label
+                      htmlFor="chat-video-profile"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Perfil de video
+                    </Label>
+                    <NativeSelect
+                      id="chat-video-profile"
+                      value={videoProfileId}
+                      className="w-full"
+                      onChange={(event) => handleVideoProfileChange(event.target.value)}
+                    >
+                      <option value="">Sin perfil de video</option>
+                      {videoProfiles.map((profile) => (
                         <option key={profile.id} value={profile.id}>
                           {profile.name}
                         </option>

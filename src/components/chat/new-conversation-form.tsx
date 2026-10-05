@@ -11,10 +11,11 @@ import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import type { Profile, ProviderKey, ProviderOption } from "@/lib/types";
+import type { Profile, Project, ProviderKey, ProviderOption } from "@/lib/types";
 
 interface NewConversationFormProps {
   profiles: Profile[];
+  projects: Project[];
   providerOptions: ProviderOption[];
   configuredProviders: ProviderKey[];
   defaultProvider: ProviderKey;
@@ -23,6 +24,7 @@ interface NewConversationFormProps {
 
 export function NewConversationForm({
   profiles,
+  projects,
   providerOptions,
   configuredProviders,
   defaultProvider,
@@ -53,6 +55,7 @@ export function NewConversationForm({
       : initialOption.defaultModel,
   );
   const [profileId, setProfileId] = useState<string>(profiles[0]?.id ?? "");
+  const [projectId, setProjectId] = useState<string>("");
 
   const current = providerOptions.find((option) => option.key === provider);
 
@@ -65,6 +68,7 @@ export function NewConversationForm({
     startTransition(async () => {
       const result = await createConversation({
         profileId: profileId || null,
+        projectId: projectId || null,
         provider,
         model,
       });
@@ -103,6 +107,22 @@ export function NewConversationForm({
             para definir el estilo de tus guiones.
           </p>
         ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="new-project">Proyecto (opcional)</Label>
+        <NativeSelect
+          id="new-project"
+          value={projectId}
+          onChange={(event) => setProjectId(event.target.value)}
+        >
+          <option value="">Sin proyecto</option>
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </NativeSelect>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

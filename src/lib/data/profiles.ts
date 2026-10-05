@@ -1,11 +1,14 @@
 import "server-only";
 
 import { prisma, serializeDates } from "@/lib/db";
-import type { Profile } from "@/lib/types";
+import type { Profile, ProfileType } from "@/lib/types";
 
-export async function listProfiles(userId: string): Promise<Profile[]> {
+export async function listProfiles(
+  userId: string,
+  type?: ProfileType,
+): Promise<Profile[]> {
   const rows = await prisma.profile.findMany({
-    where: { user_id: userId },
+    where: { user_id: userId, ...(type ? { type } : {}) },
     orderBy: { name: "asc" },
   });
 
