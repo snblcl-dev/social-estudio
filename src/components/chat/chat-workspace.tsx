@@ -89,7 +89,10 @@ interface PendingAttachment {
   id: string;
   filename: string;
   mediaType: string;
-  size: number;
+  /** Tamaño original del archivo elegido. */
+  originalSize: number;
+  /** Tamaño ya comprimido que se enviará y persistirá. */
+  compressedSize: number;
   /** Data URL que se envía al modelo y se persiste. */
   url: string;
   /** Vista previa para imágenes (mismo data URL). */
@@ -347,7 +350,8 @@ export function ChatWorkspace({
           id: crypto.randomUUID(),
           filename: file.name,
           mediaType: result.mediaType,
-          size: file.size,
+          originalSize: file.size,
+          compressedSize: dataUrlByteLength(result.url),
           url: result.url,
           previewUrl: isImage ? result.url : null,
         });
@@ -664,7 +668,11 @@ export function ChatWorkspace({
                 )}
                 <span className="flex flex-col">
                   <span className="max-w-[12rem] truncate">{item.filename}</span>
-                  <span className="text-muted-foreground">{formatBytes(item.size)}</span>
+                  <span className="text-muted-foreground">
+                    {item.compressedSize !== item.originalSize
+                      ? `${formatBytes(item.originalSize)} → ${formatBytes(item.compressedSize)}`
+                      : formatBytes(item.originalSize)}
+                  </span>
                 </span>
                 <button
                   type="button"
