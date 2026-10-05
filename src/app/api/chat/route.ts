@@ -2,6 +2,7 @@ import {
   convertToModelMessages,
   createIdGenerator,
   createUIMessageStreamResponse,
+  pruneMessages,
   streamText,
   toUIMessageStream,
   type UIMessage,
@@ -13,6 +14,7 @@ import { MissingApiKeyError, resolveModelForUser } from "@/lib/ai/model";
 import { getProfile } from "@/lib/data/profiles";
 import { prisma } from "@/lib/db";
 import { isProviderKey } from "@/lib/providers";
+import { REASONING_EFFORT_VALUES } from "@/lib/reasoning";
 import { getCurrentUser } from "@/lib/session";
 import type { Profile, ProviderKey } from "@/lib/types";
 
@@ -27,6 +29,7 @@ const bodySchema = z.object({
   profileId: z.string().uuid().nullable().optional(),
   provider: z.string(),
   model: z.string(),
+  reasoning: z.enum(REASONING_EFFORT_VALUES).optional(),
   mode: z.enum(["chat", "image-prompts"]).optional(),
 });
 
@@ -177,7 +180,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
 
-  const { conversationId, profileId, provider, model, mode } = parsed.data;
+  const { conversationId, profileId, provider, model, reasoning, mode } = parsed.data;
 
   if (!isProviderKey(provider)) {
     return NextResponse.json({ error: "Proveedor inválido." }, { status: 400 });
@@ -191,7 +194,12 @@ export async function POST(request: Request) {
 
   try {
     const profile = profileId ? await getProfile(user.id, profileId) : null;
-    const languageModel = await resolveModelForUser(user.id, provider as ProviderKey, model);
+    const languageModel = await resolveModelForUser(
+      user.id,
+      provider as ProviderKey,
+      model,
+      reasoning,
+    );
 
     if (mode === "image-prompts") {
       console.log("[api/chat] petición de prompts de imagen", {
@@ -204,7 +212,13 @@ export async function POST(request: Request) {
     const result = streamText({
       model: languageModel,
       instructions: buildInstructions(profile),
-      messages: await convertToModelMessages(messages),
+      // El razonamiento se guarda en el historial, pero no se reenvía al
+      // modelo: evita errores de firmas y ahorra tokens.
+      messages: pruneMessages({
+        messages: await convertToModelMessages(messages),
+        reasoning: "all",
+      }),
+      reasoning,
     });
 
     // Garantiza que el stream se consuma del todo (y que onEnd se dispare)

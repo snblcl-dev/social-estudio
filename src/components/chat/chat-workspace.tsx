@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   BotIcon,
+  ChevronRightIcon,
   ImageIcon,
   Loader2Icon,
   SaveIcon,
@@ -18,13 +19,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { saveConversationMessages } from "@/app/actions/conversations";
+import { saveConversationMessages, updateConversation } from "@/app/actions/conversations";
 import { saveScript } from "@/app/actions/scripts";
 import { ModelSelect } from "@/components/model-select";
 import { NativeSelect } from "@/components/native-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import type { Conversation, Profile, ProviderKey, ProviderOption } from "@/lib/types";
+import { REASONING_EFFORT_OPTIONS } from "@/lib/reasoning";
+import type {
+  Conversation,
+  Profile,
+  ProviderKey,
+  ProviderOption,
+  ReasoningEffort,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ChatWorkspaceProps {
@@ -39,6 +47,27 @@ function textOf(message: UIMessage) {
     .map((part) => (part.type === "text" ? part.text : ""))
     .join("")
     .trim();
+}
+
+function reasoningOf(message: UIMessage) {
+  return message.parts
+    .map((part) => (part.type === "reasoning" ? part.text : ""))
+    .join("")
+    .trim();
+}
+
+function ReasoningBlock({ text }: { text: string }) {
+  return (
+    <details className="group w-full rounded-2xl rounded-tl-sm border border-border/60 bg-muted/30 px-4 py-2.5">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium text-muted-foreground select-none">
+        <ChevronRightIcon className="size-3.5 transition-transform group-open:rotate-90" />
+        Razonamiento
+      </summary>
+      <div className="mt-2 text-sm break-words whitespace-pre-wrap text-muted-foreground">
+        {text}
+      </div>
+    </details>
+  );
 }
 
 export function ChatWorkspace({
@@ -57,6 +86,10 @@ export function ChatWorkspace({
       "",
   );
   const [profileId, setProfileId] = useState(conversation.profile_id ?? "");
+  const [showReasoning, setShowReasoning] = useState(conversation.show_reasoning);
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(
+    conversation.reasoning_effort,
+  );
   const [isSavingScript, setIsSavingScript] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -166,6 +199,7 @@ export function ChatWorkspace({
             profileId: profileId || null,
             provider,
             model,
+            reasoning: reasoningEffort,
           },
         },
       );
@@ -181,6 +215,20 @@ export function ChatWorkspace({
   function handleProviderChange(next: ProviderKey) {
     setProvider(next);
     setModel(providerOptions.find((option) => option.key === next)?.defaultModel ?? "");
+  }
+
+  function handleReasoningEffortChange(next: ReasoningEffort) {
+    setReasoningEffort(next);
+    void updateConversation({ id: conversation.id, reasoningEffort: next }).then((result) => {
+      if (result.error) toast.error(result.error);
+    });
+  }
+
+  function handleShowReasoningChange(next: boolean) {
+    setShowReasoning(next);
+    void updateConversation({ id: conversation.id, showReasoning: next }).then((result) => {
+      if (result.error) toast.error(result.error);
+    });
   }
 
   async function handleGenerateImagePrompts() {
@@ -204,6 +252,7 @@ export function ChatWorkspace({
             profileId: profileId || null,
             provider,
             model,
+            reasoning: reasoningEffort,
             mode: "image-prompts",
           },
         },
@@ -271,9 +320,10 @@ export function ChatWorkspace({
           <div className="flex flex-col gap-5">
             {messages.map((message) => {
               const text = textOf(message);
-              if (!text) return null;
-
               const isUser = message.role === "user";
+              const reasoning = isUser ? "" : reasoningOf(message);
+
+              if (!text && !(showReasoning && reasoning)) return null;
 
               return (
                 <div
@@ -296,13 +346,23 @@ export function ChatWorkspace({
                   </span>
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm break-words whitespace-pre-wrap",
-                      isUser
-                        ? "rounded-tr-sm bg-primary text-primary-foreground"
-                        : "rounded-tl-sm border border-border/60 bg-muted/60 text-foreground",
+                      "flex max-w-[85%] flex-col gap-2",
+                      isUser ? "items-end" : "items-start",
                     )}
                   >
-                    {text}
+                    {showReasoning && reasoning ? <ReasoningBlock text={reasoning} /> : null}
+                    {text ? (
+                      <div
+                        className={cn(
+                          "max-w-full rounded-2xl px-4 py-2.5 text-sm break-words whitespace-pre-wrap",
+                          isUser
+                            ? "rounded-tr-sm bg-primary text-primary-foreground"
+                            : "rounded-tl-sm border border-border/60 bg-muted/60 text-foreground",
+                        )}
+                      >
+                        {text}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -461,6 +521,39 @@ export function ChatWorkspace({
                       }
                     />
                   </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Label
+                      htmlFor="chat-reasoning"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Esfuerzo de razonamiento
+                    </Label>
+                    <NativeSelect
+                      id="chat-reasoning"
+                      value={reasoningEffort}
+                      className="w-full"
+                      onChange={(event) =>
+                        handleReasoningEffortChange(event.target.value as ReasoningEffort)
+                      }
+                    >
+                      {REASONING_EFFORT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+
+                  <label className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/50 px-2.5 py-2 text-xs">
+                    <span className="text-muted-foreground">Mostrar razonamiento</span>
+                    <input
+                      type="checkbox"
+                      checked={showReasoning}
+                      onChange={(event) => handleShowReasoningChange(event.target.checked)}
+                      className="size-4 accent-primary"
+                    />
+                  </label>
 
                   <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/50 px-2.5 py-2 text-xs">
                     <ImageIcon className="mt-0.5 size-3.5 shrink-0 text-accent" />

@@ -58,6 +58,16 @@ export interface ApiKeyRow {
   updated_at: string;
 }
 
+/** Nivel de esfuerzo de razonamiento unificado del AI SDK. */
+export type ReasoningEffort =
+  | "provider-default"
+  | "none"
+  | "minimal"
+  | "low"
+  | "medium"
+  | "high"
+  | "xhigh";
+
 export interface Conversation {
   id: string;
   user_id: string;
@@ -65,6 +75,8 @@ export interface Conversation {
   title: string;
   provider: ProviderKey;
   model: string;
+  show_reasoning: boolean;
+  reasoning_effort: ReasoningEffort;
   created_at: string;
   updated_at: string;
 }

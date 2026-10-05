@@ -141,14 +141,16 @@ model ApiKey {
 // ---------------------------------------------------------------------------
 
 model Conversation {
-  id         String   @id @default(uuid())
-  user_id    String
-  profile_id String?
-  title      String   @default("Nueva conversación")
-  provider   String   @default("openai")
-  model      String   @default("")
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  id               String   @id @default(uuid())
+  user_id          String
+  profile_id       String?
+  title            String   @default("Nueva conversación")
+  provider         String   @default("openai")
+  model            String   @default("")
+  show_reasoning   Boolean  @default(false)
+  reasoning_effort String   @default("provider-default")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
 
   user     User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   profile  Profile? @relation(fields: [profile_id], references: [id], onDelete: SetNull)

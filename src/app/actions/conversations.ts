@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/db";
 import { isProviderKey } from "@/lib/providers";
+import { DEFAULT_REASONING_EFFORT, isReasoningEffort } from "@/lib/reasoning";
 import { getCurrentUser } from "@/lib/session";
 
 export interface ActionResult {
@@ -117,12 +118,18 @@ export async function createConversation(input: {
   provider: string;
   model: string;
   title?: string;
+  showReasoning?: boolean;
+  reasoningEffort?: string;
 }): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
 
   if (!isProviderKey(input.provider)) {
     return { error: "Proveedor inválido." };
+  }
+
+  if (input.reasoningEffort !== undefined && !isReasoningEffort(input.reasoningEffort)) {
+    return { error: "Esfuerzo de razonamiento inválido." };
   }
 
   try {
@@ -133,6 +140,8 @@ export async function createConversation(input: {
         provider: input.provider,
         model: input.model,
         title: input.title?.trim() || "Nueva conversación",
+        show_reasoning: input.showReasoning ?? false,
+        reasoning_effort: input.reasoningEffort ?? DEFAULT_REASONING_EFFORT,
       },
       select: { id: true },
     });
@@ -150,6 +159,8 @@ export async function updateConversation(input: {
   profileId?: string | null;
   provider?: string;
   model?: string;
+  showReasoning?: boolean;
+  reasoningEffort?: string;
 }): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "No autenticado." };
@@ -159,6 +170,13 @@ export async function updateConversation(input: {
   if (typeof input.title === "string") data.title = input.title.trim() || "Sin título";
   if (input.profileId !== undefined) data.profile_id = input.profileId;
   if (input.model) data.model = input.model;
+  if (typeof input.showReasoning === "boolean") data.show_reasoning = input.showReasoning;
+  if (input.reasoningEffort !== undefined) {
+    if (!isReasoningEffort(input.reasoningEffort)) {
+      return { error: "Esfuerzo de razonamiento inválido." };
+    }
+    data.reasoning_effort = input.reasoningEffort;
+  }
   if (input.provider) {
     if (!isProviderKey(input.provider)) return { error: "Proveedor inválido." };
     data.provider = input.provider;
