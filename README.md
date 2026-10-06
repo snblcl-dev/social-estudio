@@ -5,6 +5,7 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
 - **Chat** con streaming y selección de proveedor/modelo (OpenAI, Anthropic, Google/Gemini, DeepSeek, OpenRouter).
 - **Proveedores personalizados** compatibles con la API de OpenAI (URL base propia) y **modelos manuales** por si el listado automático no los devuelve.
 - **Perfiles** con instrucciones personalizadas de estilo de guion y de temas (ej. estilo bíblico).
+- **Perfiles de video** (independientes de los de guion) para definir los prompts de video.
 - **Prompts de imagen** generados a partir del guion usando tus instrucciones de estilo.
 - **Guiones**: crea guiones **a mano** o guárdalos desde el chat; ver, **editar**, copiar/descargar y generar voz.
 - **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut): genera, reproduce y descarga la locución de cada guion.
@@ -82,10 +83,14 @@ primera API key.
    Guarda también tu **clave de Vibi** para generar la voz de los guiones.
 2. **Perfiles** → crea perfiles con sus instrucciones: estilo de guion, temas y **prompts de
    imagen** (aquí defines, por ejemplo, cuántas escenas quieres y el estilo visual).
-3. **Chat** → elige perfil, proveedor y modelo; pide un tema y el guion se genera en streaming.
-4. Pulsa **Generar prompts de imagen** y los prompts aparecerán **como un mensaje más del chat**,
-   usando las instrucciones de prompts de imagen del perfil activo (número de escenas y estilo).
-   Puedes copiarlos desde el propio mensaje.
+   En **Perfiles de video** crea perfiles aparte con las instrucciones de **prompts de video**.
+   Cada chat usa **solo** el tipo de perfil que elijas (guion/imagen o video), sin mezclarlos.
+3. **Chat** → al crear la conversación elige el **tipo de perfil** (Guion e imagen o Video), el
+   perfil, el proyecto y el modelo. Dentro del chat puedes cambiar tipo y perfil en **Ajustes**.
+4. En un chat de guion, pulsa **Prompts de imagen** y los prompts aparecerán **como un mensaje
+   más del chat**, usando las instrucciones de prompts de imagen del perfil activo (número de
+   escenas y estilo). En un chat de video, pulsa **Prompts de video** para generar los prompts de
+   video con las instrucciones del perfil de video. Puedes copiarlos desde el propio mensaje.
 5. **Guardar en Guiones** guarda el último mensaje del asistente en **Guiones**, donde puedes
    verlo, **editarlo** (título y contenido), copiarlo o eliminarlo.
 6. **Guiones → Generar voz** convierte un guion guardado en audio con Vibi (elige proveedor,

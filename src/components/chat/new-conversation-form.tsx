@@ -15,6 +15,7 @@ import type { Profile, Project, ProviderKey, ProviderOption } from "@/lib/types"
 
 interface NewConversationFormProps {
   profiles: Profile[];
+  videoProfiles: Profile[];
   projects: Project[];
   providerOptions: ProviderOption[];
   configuredProviders: ProviderKey[];
@@ -24,6 +25,7 @@ interface NewConversationFormProps {
 
 export function NewConversationForm({
   profiles,
+  videoProfiles,
   projects,
   providerOptions,
   configuredProviders,
@@ -54,8 +56,15 @@ export function NewConversationForm({
       ? defaultModel
       : initialOption.defaultModel,
   );
+  const [profileKind, setProfileKind] = useState<"script" | "video">(
+    profiles.length > 0 ? "script" : videoProfiles.length > 0 ? "video" : "script",
+  );
   const [profileId, setProfileId] = useState<string>(profiles[0]?.id ?? "");
+  const [videoProfileId, setVideoProfileId] = useState<string>(videoProfiles[0]?.id ?? "");
   const [projectId, setProjectId] = useState<string>("");
+
+  const kindProfiles = profileKind === "video" ? videoProfiles : profiles;
+  const selectedProfileId = profileKind === "video" ? videoProfileId : profileId;
 
   const current = providerOptions.find((option) => option.key === provider);
 
@@ -67,7 +76,9 @@ export function NewConversationForm({
   function handleCreate() {
     startTransition(async () => {
       const result = await createConversation({
-        profileId: profileId || null,
+        profileKind,
+        profileId: profileKind === "script" ? profileId || null : null,
+        videoProfileId: profileKind === "video" ? videoProfileId || null : null,
         projectId: projectId || null,
         provider,
         model,
@@ -85,26 +96,52 @@ export function NewConversationForm({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
+        <Label htmlFor="new-profile-kind">Tipo de perfil</Label>
+        <NativeSelect
+          id="new-profile-kind"
+          value={profileKind}
+          onChange={(event) =>
+            setProfileKind(event.target.value as "script" | "video")
+          }
+        >
+          <option value="script">Guion e imagen</option>
+          <option value="video">Video</option>
+        </NativeSelect>
+        <p className="text-xs text-muted-foreground">
+          El chat usará únicamente las instrucciones del tipo de perfil que elijas.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label htmlFor="new-profile">Perfil</Label>
         <NativeSelect
           id="new-profile"
-          value={profileId}
-          onChange={(event) => setProfileId(event.target.value)}
+          value={selectedProfileId}
+          onChange={(event) =>
+            profileKind === "video"
+              ? setVideoProfileId(event.target.value)
+              : setProfileId(event.target.value)
+          }
         >
-          <option value="">Sin perfil (tono neutro)</option>
-          {profiles.map((profile) => (
+          <option value="">
+            {profileKind === "video" ? "Sin perfil de video" : "Sin perfil (tono neutro)"}
+          </option>
+          {kindProfiles.map((profile) => (
             <option key={profile.id} value={profile.id}>
               {profile.name}
             </option>
           ))}
         </NativeSelect>
-        {profiles.length === 0 ? (
+        {kindProfiles.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Todavía no tienes perfiles.{" "}
-            <Link href="/perfiles" className="underline underline-offset-4">
+            Todavía no tienes perfiles de este tipo.{" "}
+            <Link
+              href={profileKind === "video" ? "/perfiles-video" : "/perfiles"}
+              className="underline underline-offset-4"
+            >
               Crea el primero
             </Link>{" "}
-            para definir el estilo de tus guiones.
+            para definir sus instrucciones.
           </p>
         ) : null}
       </div>

@@ -85,6 +85,8 @@ export type ReasoningEffort =
 export interface Conversation {
   id: string;
   user_id: string;
+  /** "script" = perfil de guion e imagen; "video" = perfil de video. */
+  profile_kind: ProfileType;
   profile_id: string | null;
   video_profile_id: string | null;
   project_id: string | null;

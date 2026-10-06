@@ -69,6 +69,7 @@ export default async function ChatPage({
           <CardContent>
             <NewConversationForm
               profiles={profiles}
+              videoProfiles={videoProfiles}
               projects={projects}
               providerOptions={providerOptions}
               configuredProviders={configuredProviders}

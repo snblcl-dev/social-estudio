@@ -114,6 +114,7 @@ export async function saveConversationMessages(input: SaveMessagesInput): Promis
 }
 
 export async function createConversation(input: {
+  profileKind?: "script" | "video";
   profileId: string | null;
   videoProfileId?: string | null;
   projectId?: string | null;
@@ -134,12 +135,16 @@ export async function createConversation(input: {
     return { error: "Esfuerzo de razonamiento inválido." };
   }
 
+  const profileKind = input.profileKind ?? "script";
+
   try {
     const created = await prisma.conversation.create({
       data: {
         user_id: user.id,
-        profile_id: input.profileId,
-        video_profile_id: input.videoProfileId ?? null,
+        profile_kind: profileKind,
+        // Cada chat guarda solo el perfil de su tipo.
+        profile_id: profileKind === "script" ? input.profileId : null,
+        video_profile_id: profileKind === "video" ? (input.videoProfileId ?? null) : null,
         project_id: input.projectId ?? null,
         provider: input.provider,
         model: input.model,
@@ -160,6 +165,7 @@ export async function createConversation(input: {
 export async function updateConversation(input: {
   id: string;
   title?: string;
+  profileKind?: "script" | "video";
   profileId?: string | null;
   videoProfileId?: string | null;
   projectId?: string | null;
@@ -174,6 +180,12 @@ export async function updateConversation(input: {
   const data: Prisma.ConversationUncheckedUpdateManyInput = {};
 
   if (typeof input.title === "string") data.title = input.title.trim() || "Sin título";
+  if (input.profileKind !== undefined) {
+    data.profile_kind = input.profileKind;
+    // Al cambiar de tipo se limpia el perfil del otro tipo para no mezclar.
+    if (input.profileKind === "video") data.profile_id = null;
+    else data.video_profile_id = null;
+  }
   if (input.profileId !== undefined) data.profile_id = input.profileId;
   if (input.videoProfileId !== undefined) data.video_profile_id = input.videoProfileId;
   if (input.projectId !== undefined) data.project_id = input.projectId;

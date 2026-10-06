@@ -148,6 +148,8 @@ model ApiKey {
 model Conversation {
   id               String   @id @default(uuid())
   user_id          String
+  // "script" usa profile_id (guion + imagen); "video" usa video_profile_id.
+  profile_kind     String   @default("script")
   profile_id       String?
   video_profile_id String?
   project_id       String?

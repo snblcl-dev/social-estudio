@@ -28,6 +28,7 @@ const bodySchema = z.object({
   conversationId: z.string().uuid("Conversación inválida."),
   profileId: z.string().uuid().nullable().optional(),
   videoProfileId: z.string().uuid().nullable().optional(),
+  chatType: z.enum(["script", "video"]).optional(),
   provider: z.string(),
   model: z.string(),
   reasoning: z.enum(REASONING_EFFORT_VALUES).optional(),
@@ -248,8 +249,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Datos inválidos." }, { status: 400 });
   }
 
-  const { conversationId, profileId, videoProfileId, provider, model, reasoning, mode } =
-    parsed.data;
+  const {
+    conversationId,
+    profileId,
+    videoProfileId,
+    chatType,
+    provider,
+    model,
+    reasoning,
+    mode,
+  } = parsed.data;
 
   if (!isProviderKey(provider)) {
     return NextResponse.json({ error: "Proveedor inválido." }, { status: 400 });
@@ -262,7 +271,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const isVideoMode = mode === "video-prompts";
+    // Un chat de video es aquel cuyo perfil es de video. Se decide por el tipo
+    // de chat enviado por el cliente (persistido en la conversación) y, como
+    // respaldo, por la presencia de `videoProfileId` sin `profileId`. Así cada
+    // chat usa únicamente las instrucciones de su propio perfil: los de guion
+    // no reciben las de video y viceversa.
+    const isVideoChat =
+      chatType === "video" || (Boolean(videoProfileId) && !profileId);
+    const isVideoMode = mode === "video-prompts" || isVideoChat;
     const profile = !isVideoMode && profileId ? await getProfile(user.id, profileId) : null;
     const videoProfile =
       isVideoMode && videoProfileId ? await getProfile(user.id, videoProfileId) : null;

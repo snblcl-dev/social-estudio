@@ -204,6 +204,12 @@ export function ChatWorkspace({
       providerOptions.find((option) => option.key === conversation.provider)?.defaultModel ||
       "",
   );
+  const [profileKind, setProfileKind] = useState<"script" | "video">(
+    conversation.profile_kind === "video" ||
+      (!conversation.profile_id && Boolean(conversation.video_profile_id))
+      ? "video"
+      : "script",
+  );
   const [profileId, setProfileId] = useState(conversation.profile_id ?? "");
   const [videoProfileId, setVideoProfileId] = useState(
     conversation.video_profile_id ?? "",
@@ -300,6 +306,8 @@ export function ChatWorkspace({
   }, [messages]);
 
   const activeProfile = profiles.find((profile) => profile.id === profileId) ?? null;
+  const activeVideoProfile =
+    videoProfiles.find((profile) => profile.id === videoProfileId) ?? null;
   const hasImageInstructions = Boolean(activeProfile?.image_prompt_instructions?.trim());
 
   useEffect(() => {
@@ -410,7 +418,9 @@ export function ChatWorkspace({
       await sendMessage(message, {
         body: {
           conversationId: conversation.id,
+          chatType: profileKind,
           profileId: profileId || null,
+          videoProfileId: videoProfileId || null,
           provider,
           model,
           reasoning: reasoningEffort,
@@ -481,13 +491,62 @@ export function ChatWorkspace({
     }
   }
 
-  function handleVideoProfileChange(next: string) {
-    setVideoProfileId(next);
-    void updateConversation({ id: conversation.id, videoProfileId: next || null }).then(
-      (result) => {
+  function handleProfileKindChange(next: "script" | "video") {
+    setProfileKind(next);
+
+    if (next === "video") {
+      const first = videoProfiles[0]?.id ?? "";
+      setVideoProfileId(first);
+      setProfileId("");
+      void updateConversation({
+        id: conversation.id,
+        profileKind: next,
+        videoProfileId: first || null,
+        profileId: null,
+      }).then((result) => {
         if (result.error) toast.error(result.error);
-      },
-    );
+      });
+      return;
+    }
+
+    const first = profiles[0]?.id ?? "";
+    setProfileId(first);
+    setVideoProfileId("");
+    void updateConversation({
+      id: conversation.id,
+      profileKind: next,
+      profileId: first || null,
+      videoProfileId: null,
+    }).then((result) => {
+      if (result.error) toast.error(result.error);
+    });
+  }
+
+  function handleProfileChange(next: string) {
+    if (profileKind === "video") {
+      setVideoProfileId(next);
+      setProfileId("");
+      void updateConversation({
+        id: conversation.id,
+        profileKind: "video",
+        videoProfileId: next || null,
+        profileId: null,
+      }).then((result) => {
+        if (result.error) toast.error(result.error);
+      });
+      return;
+    }
+
+    setProfileId(next);
+    setVideoProfileId("");
+    void updateConversation({
+      id: conversation.id,
+      profileKind: "script",
+      profileId: next || null,
+      videoProfileId: null,
+    }).then((result) => {
+      if (result.error) toast.error(result.error);
+    });
   }
 
   async function handleGenerateVideoPrompts() {
@@ -785,27 +844,29 @@ export function ChatWorkspace({
             </Button>
           ) : null}
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleGenerateImagePrompts}
-            disabled={isBusy || !lastAssistantText}
-            title="Pedir prompts de imagen al modelo"
-          >
-            <SparklesIcon />
-            Prompts de imagen
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleGenerateVideoPrompts}
-            disabled={isBusy || messages.length === 0}
-            title="Pedir prompts de video al modelo"
-          >
-            <VideoIcon />
-            Prompts de video
-          </Button>
+          {profileKind === "script" ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGenerateImagePrompts}
+              disabled={isBusy || !lastAssistantText}
+              title="Pedir prompts de imagen al modelo"
+            >
+              <SparklesIcon />
+              Prompts de imagen
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGenerateVideoPrompts}
+              disabled={isBusy || messages.length === 0}
+              title="Pedir prompts de video al modelo"
+            >
+              <VideoIcon />
+              Prompts de video
+            </Button>
+          )}
 
           <Button
             type="button"
@@ -837,39 +898,39 @@ export function ChatWorkspace({
               <div className="absolute right-0 bottom-full z-30 mb-2 w-72 rounded-xl border border-border/60 bg-popover p-4 text-popover-foreground shadow-xl shadow-black/40">
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-1.5">
+                    <Label
+                      htmlFor="chat-profile-kind"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Tipo de perfil
+                    </Label>
+                    <NativeSelect
+                      id="chat-profile-kind"
+                      value={profileKind}
+                      className="w-full"
+                      onChange={(event) =>
+                        handleProfileKindChange(event.target.value as "script" | "video")
+                      }
+                    >
+                      <option value="script">Guion e imagen</option>
+                      <option value="video">Video</option>
+                    </NativeSelect>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
                     <Label htmlFor="chat-profile" className="text-xs text-muted-foreground">
                       Perfil
                     </Label>
                     <NativeSelect
                       id="chat-profile"
-                      value={profileId}
+                      value={profileKind === "video" ? videoProfileId : profileId}
                       className="w-full"
-                      onChange={(event) => setProfileId(event.target.value)}
+                      onChange={(event) => handleProfileChange(event.target.value)}
                     >
-                      <option value="">Sin perfil</option>
-                      {profiles.map((profile) => (
-                        <option key={profile.id} value={profile.id}>
-                          {profile.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label
-                      htmlFor="chat-video-profile"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Perfil de video
-                    </Label>
-                    <NativeSelect
-                      id="chat-video-profile"
-                      value={videoProfileId}
-                      className="w-full"
-                      onChange={(event) => handleVideoProfileChange(event.target.value)}
-                    >
-                      <option value="">Sin perfil de video</option>
-                      {videoProfiles.map((profile) => (
+                      <option value="">
+                        {profileKind === "video" ? "Sin perfil de video" : "Sin perfil"}
+                      </option>
+                      {(profileKind === "video" ? videoProfiles : profiles).map((profile) => (
                         <option key={profile.id} value={profile.id}>
                           {profile.name}
                         </option>
@@ -950,9 +1011,35 @@ export function ChatWorkspace({
                   </label>
 
                   <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/50 px-2.5 py-2 text-xs">
-                    <ImageIcon className="mt-0.5 size-3.5 shrink-0 text-accent" />
+                    {profileKind === "video" ? (
+                      <VideoIcon className="mt-0.5 size-3.5 shrink-0 text-accent" />
+                    ) : (
+                      <ImageIcon className="mt-0.5 size-3.5 shrink-0 text-accent" />
+                    )}
                     <span className="text-muted-foreground">
-                      {activeProfile ? (
+                      {profileKind === "video" ? (
+                        activeVideoProfile ? (
+                          (activeVideoProfile.video_prompt_instructions ?? "").trim() ? (
+                            <>Prompts de video: {activeVideoProfile.name}</>
+                          ) : (
+                            <span className="text-amber-500">
+                              «{activeVideoProfile.name}» no tiene instrucciones de video.
+                              Añádelas en{" "}
+                              <Link
+                                href="/perfiles-video"
+                                className="text-primary underline underline-offset-4"
+                              >
+                                Perfiles de video
+                              </Link>
+                              .
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-amber-500">
+                            Sin perfil de video: se usarán instrucciones genéricas (3-6 escenas).
+                          </span>
+                        )
+                      ) : activeProfile ? (
                         hasImageInstructions ? (
                           <>Prompts de imagen: {activeProfile.name}</>
                         ) : (
