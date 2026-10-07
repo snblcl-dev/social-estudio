@@ -4,6 +4,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import {
   extractReasoningMiddleware,
@@ -46,25 +47,6 @@ export function buildModel(
     extractReasoningMiddleware({ tagName: "thinking" }),
   ];
 
-  if (baseURL) {
-    // Los endpoints compatibles con OpenAI (gateways personalizados) solo
-    // aceptan el rol `system`. El SDK de OpenAI lo convierte a `developer`
-    // cuando el id del modelo parece de razonamiento (p. ej. `o4-mini`,
-    // `gpt-5…`), lo que provoca un 400 en esos gateways. Se fuerza `system`.
-    middleware.push({
-      transformParams: async ({ params }) => ({
-        ...params,
-        providerOptions: {
-          ...params.providerOptions,
-          openai: {
-            ...params.providerOptions?.openai,
-            systemMessageMode: "system",
-          },
-        },
-      }),
-    });
-  }
-
   return wrapLanguageModel({ model: base, middleware });
 }
 
@@ -76,9 +58,16 @@ function buildBaseModel(
   effort?: ReasoningEffort,
 ): WrappableLanguageModel {
   // Proveedores compatibles con la API de OpenAI (gateways personalizados).
-  // Se usa Chat Completions porque es lo que exponen estos servicios.
+  // Se usa el provider específico porque reconoce los campos nativos de
+  // razonamiento (`reasoning` / `reasoning_content`) y siempre envía el rol
+  // `system` (nunca `developer`, que estos gateways rechazan).
   if (baseURL) {
-    return createOpenAI({ apiKey, baseURL, name: provider }).chat(model);
+    return createOpenAICompatible({
+      name: provider,
+      apiKey,
+      baseURL,
+      includeUsage: true,
+    }).chatModel(model);
   }
 
   switch (provider) {
