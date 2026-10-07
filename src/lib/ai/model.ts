@@ -41,13 +41,31 @@ export function buildModel(
   // Algunos modelos escriben su razonamiento como texto con etiquetas
   // `<think>` / `<thinking>`. El middleware lo separa en partes `reasoning`
   // para poder mostrarlo u ocultarlo en la interfaz.
-  return wrapLanguageModel({
-    model: base,
-    middleware: [
-      extractReasoningMiddleware({ tagName: "think" }),
-      extractReasoningMiddleware({ tagName: "thinking" }),
-    ],
-  });
+  const middleware = [
+    extractReasoningMiddleware({ tagName: "think" }),
+    extractReasoningMiddleware({ tagName: "thinking" }),
+  ];
+
+  if (baseURL) {
+    // Los endpoints compatibles con OpenAI (gateways personalizados) solo
+    // aceptan el rol `system`. El SDK de OpenAI lo convierte a `developer`
+    // cuando el id del modelo parece de razonamiento (p. ej. `o4-mini`,
+    // `gpt-5…`), lo que provoca un 400 en esos gateways. Se fuerza `system`.
+    middleware.push({
+      transformParams: async ({ params }) => ({
+        ...params,
+        providerOptions: {
+          ...params.providerOptions,
+          openai: {
+            ...params.providerOptions?.openai,
+            systemMessageMode: "system",
+          },
+        },
+      }),
+    });
+  }
+
+  return wrapLanguageModel({ model: base, middleware });
 }
 
 function buildBaseModel(
