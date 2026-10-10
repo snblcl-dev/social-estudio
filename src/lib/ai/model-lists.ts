@@ -116,6 +116,42 @@ async function listGoogleModels(apiKey: string) {
   return extractIds(json, "models");
 }
 
+/**
+ * Anthropic expone su catálogo en `/v1/models`, pero con cabeceras propias
+ * (`x-api-key` y `anthropic-version`) en lugar de `Authorization: Bearer`, y
+ * con paginación por cursor (`after_id`).
+ */
+async function listAnthropicModels(apiKey: string) {
+  const base = "https://api.anthropic.com/v1/models?limit=1000";
+  const ids: string[] = [];
+  let afterId: string | null = null;
+
+  for (let page = 0; page < 20; page += 1) {
+    const url = afterId ? `${base}&after_id=${encodeURIComponent(afterId)}` : base;
+    const json = await fetchJson(url, {
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+    });
+
+    const list = json.data;
+    if (!Array.isArray(list)) throw new Error("Respuesta inesperada del proveedor.");
+
+    for (const item of list) {
+      const entry = item as { id?: unknown };
+      if (typeof entry.id === "string") ids.push(entry.id);
+    }
+
+    const hasMore = json.has_more === true;
+    const lastId = typeof json.last_id === "string" ? json.last_id : null;
+    if (!hasMore || !lastId) break;
+    afterId = lastId;
+  }
+
+  return cleanModelIds(ids);
+}
+
 /** Consulta al proveedor si expone un endpoint de modelos. */
 async function fetchRemoteModels(
   userId: string,
@@ -132,15 +168,13 @@ async function fetchRemoteModels(
   }
 
   switch (provider) {
-    case "anthropic":
-      // Anthropic no expone un endpoint público para listar modelos.
-      return [];
-
     case "openai":
     case "deepseek":
     case "openrouter":
-    case "google": {
+    case "google":
+    case "anthropic": {
       const apiKey = await requireApiKey(userId, provider);
+      if (provider === "anthropic") return listAnthropicModels(apiKey);
       if (provider === "openai") return listOpenAIModels(apiKey);
       if (provider === "deepseek") return listDeepSeekModels(apiKey);
       if (provider === "openrouter") return listOpenRouterModels(apiKey);
