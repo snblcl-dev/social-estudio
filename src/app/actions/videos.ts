@@ -545,28 +545,54 @@ export async function refreshVideoJobs(ids: string[]): Promise<VideoJobsActionRe
     if (!apiKey || first.provider_batch_id === null) continue;
     const adapter = adapterFor(first.provider);
 
-    let snapshots: Map<string, VideoProviderJob>;
+    let snapshots = new Map<string, VideoProviderJob>();
     try {
       const list = await adapter.listJobsByBatch(apiKey, first.provider_batch_id);
       snapshots = new Map(list.map((snapshot) => [snapshot.id, snapshot]));
-    } catch {
-      continue;
+    } catch (error) {
+      console.error(
+        "[video-refresh] fallo el listado del batch",
+        first.provider,
+        first.provider_batch_id,
+        error,
+      );
     }
 
     for (const job of group) {
       if (job.provider_job_id === null) continue;
-      const snapshot = snapshots.get(job.provider_job_id);
-      if (!snapshot) continue;
+
+      let snapshot = snapshots.get(job.provider_job_id);
+
+      // Si el listado no trae el job, se consulta individualmente.
+      if (!snapshot) {
+        try {
+          snapshot = await adapter.getJob(apiKey, job.provider_job_id, {
+            model: job.model,
+            resolution: job.resolution,
+          });
+        } catch (error) {
+          console.error("[video-refresh] fallo al consultar el job", job.id, error);
+          continue;
+        }
+      }
 
       const row = await applySnapshot(user.id, job, snapshot, apiKey, adapter);
-      if (row) updated.set(job.id, row);
+      if (row) {
+        if (row.status !== job.status) {
+          console.log("[video-refresh]", job.id, job.status, "->", row.status);
+        }
+        updated.set(job.id, row);
+      }
     }
   }
 
   for (const job of singles) {
     if (job.provider_job_id === null) continue;
     const apiKey = await keyFor(job.provider);
-    if (!apiKey) continue;
+    if (!apiKey) {
+      console.error("[video-refresh] sin clave para", job.provider);
+      continue;
+    }
     const adapter = adapterFor(job.provider);
 
     try {
@@ -575,8 +601,14 @@ export async function refreshVideoJobs(ids: string[]): Promise<VideoJobsActionRe
         resolution: job.resolution,
       });
       const row = await applySnapshot(user.id, job, snapshot, apiKey, adapter);
-      if (row) updated.set(job.id, row);
-    } catch {
+      if (row) {
+        if (row.status !== job.status) {
+          console.log("[video-refresh]", job.id, job.status, "->", row.status);
+        }
+        updated.set(job.id, row);
+      }
+    } catch (error) {
+      console.error("[video-refresh] fallo al consultar el job", job.id, error);
       continue;
     }
   }

@@ -841,6 +841,23 @@ export function VideoStudio({
     });
   }
 
+  function handleRefreshJob(job: VideoJob) {
+    setPendingId(job.id);
+    startTransition(async () => {
+      const result = await refreshVideoJobs([job.id]);
+      setPendingId(null);
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      if (result.jobs) {
+        setJobs((current) => mergeJobs(current, result.jobs ?? []));
+      }
+    });
+  }
+
   function handleRetryDownload(job: VideoJob) {
     setPendingId(job.id);
     startTransition(async () => {
@@ -1382,6 +1399,7 @@ export function VideoStudio({
                   isPending={pendingId === job.id}
                   onDelete={setToDelete}
                   onRetryDownload={handleRetryDownload}
+                  onRefresh={handleRefreshJob}
                 />
               ))}
             </div>

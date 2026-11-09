@@ -33,6 +33,7 @@ interface VideoJobCardProps {
   isPending: boolean;
   onDelete: (job: VideoJob) => void;
   onRetryDownload: (job: VideoJob) => void;
+  onRefresh: (job: VideoJob) => void;
 }
 
 function Chip({ children }: { children: React.ReactNode }) {
@@ -55,6 +56,7 @@ export function VideoJobCard({
   isPending,
   onDelete,
   onRetryDownload,
+  onRefresh,
 }: VideoJobCardProps) {
   const isProcessing = !TERMINAL.has(job.status);
   const isFailed = job.status === "failed" || job.status === "canceled";
@@ -146,6 +148,19 @@ export function VideoJobCard({
             >
               {isPending ? <Loader2Icon className="animate-spin" /> : <RefreshCwIcon />}
               Preparar video
+            </Button>
+          ) : null}
+
+          {isProcessing ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRefresh(job)}
+              disabled={isPending}
+              className="border-white/15 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+            >
+              {isPending ? <Loader2Icon className="animate-spin" /> : <RefreshCwIcon />}
+              Actualizar
             </Button>
           ) : null}
 
