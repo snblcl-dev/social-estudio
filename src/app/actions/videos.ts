@@ -571,7 +571,12 @@ export async function refreshVideoJobs(ids: string[]): Promise<VideoJobsActionRe
             resolution: job.resolution,
           });
         } catch (error) {
-          console.error("[video-refresh] fallo al consultar el job", job.id, error);
+          console.error(
+            "[video-refresh] fallo al consultar el job",
+            job.id,
+            job.provider_job_id,
+            error,
+          );
           continue;
         }
       }
@@ -608,7 +613,12 @@ export async function refreshVideoJobs(ids: string[]): Promise<VideoJobsActionRe
         updated.set(job.id, row);
       }
     } catch (error) {
-      console.error("[video-refresh] fallo al consultar el job", job.id, error);
+      console.error(
+        "[video-refresh] fallo al consultar el job",
+        job.id,
+        job.provider_job_id,
+        error,
+      );
       continue;
     }
   }

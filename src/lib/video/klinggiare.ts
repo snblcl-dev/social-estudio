@@ -139,30 +139,44 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
         });
       }
 
-      const text = await response.text();
+      const text = (await response.text()).replace(/^\uFEFF/, "");
+      const trimmed = text.trim();
       let json: unknown = null;
 
-      if (text) {
+      if (trimmed) {
         try {
-          json = JSON.parse(text) as unknown;
+          json = JSON.parse(trimmed) as unknown;
         } catch {
           json = null;
         }
       }
 
       if (!response.ok) {
-        const error = errorFromBody(json, response.status);
+        const error =
+          json === null
+            ? new VideoApiError({
+                message: `Klinggiare respondió con un error ${response.status}: ${
+                  trimmed.slice(0, 160) || "sin cuerpo"
+                }`,
+                status: response.status,
+                code: "UNKNOWN",
+                body: trimmed.slice(0, 500),
+              })
+            : errorFromBody(json, response.status);
         const retryAfter = Number(response.headers.get("Retry-After") ?? 0);
         error.retryAfterSeconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null;
         throw error;
       }
 
-      if (!text) return {} as T;
+      if (!trimmed) return {} as T;
       if (json === null) {
         throw new VideoApiError({
-          message: "Klinggiare devolvió una respuesta inválida.",
+          message: `Klinggiare devolvió una respuesta inválida en ${path}: ${
+            trimmed.slice(0, 160) || "sin cuerpo"
+          }`,
           status: response.status,
           code: "INVALID_RESPONSE",
+          body: trimmed.slice(0, 500),
         });
       }
 
