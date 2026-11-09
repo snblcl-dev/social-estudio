@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { VideoStudio } from "@/components/videos/video-studio";
 import { getVideoApiKey, getVideoKeySummary } from "@/lib/data/video-keys";
 import { listVideoJobs } from "@/lib/data/video-jobs";
@@ -50,12 +49,7 @@ export default async function VideosPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
-      <PageHeader
-        title="Videos"
-        description="Genera videos con IA a partir de un texto, una o varias imágenes, o un video de referencia (Motion Control)."
-      />
-
+    <div className="flex h-full min-h-0 flex-1 flex-col">
       <VideoStudio
         initialJobs={jobs}
         initialRules={rules}

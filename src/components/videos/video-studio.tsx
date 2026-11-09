@@ -5,9 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import {
   AlertTriangleIcon,
   CheckIcon,
+  ChevronDownIcon,
   FilmIcon,
+  ImagePlusIcon,
   Loader2Icon,
+  PlayIcon,
+  SlidersHorizontalIcon,
   SparklesIcon,
+  VideoIcon,
   WalletIcon,
   XIcon,
 } from "lucide-react";
@@ -36,10 +41,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBytes } from "@/lib/attachments";
 import type {
@@ -50,6 +51,7 @@ import type {
   VideoSettings,
   VideoWalletInfo,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import {
   COMMON_ASPECT_RATIOS,
   aspectOptions,
@@ -66,6 +68,12 @@ const TERMINAL = new Set(["success", "failed", "canceled"]);
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 const MAX_MOTION_BYTES = 100 * 1024 * 1024;
+
+const MODE_TABS: { id: VideoMode; label: string }[] = [
+  { id: "text", label: "Texto" },
+  { id: "image", label: "Imagen" },
+  { id: "motion", label: "Motion Control" },
+];
 
 const EXTENSION_TYPES: Record<string, string> = {
   jpg: "image/jpeg",
@@ -179,6 +187,70 @@ function discountLabel(discount: NonNullable<VideoQuote["discount"]>): string {
     : `${formatVnd(discount.value)} de descuento`;
 }
 
+function FieldSelect({
+  label,
+  value,
+  onChange,
+  disabled,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 transition-colors focus-within:border-primary/50">
+      <span className="block text-[10px] font-medium tracking-[0.14em] text-white/35 uppercase">
+        {label}
+      </span>
+      <div className="relative mt-0.5">
+        <select
+          value={value}
+          onChange={onChange}
+          disabled={disabled}
+          className="w-full appearance-none bg-transparent pr-5 text-sm font-medium text-white outline-none disabled:opacity-50 [&>option]:bg-popover [&>option]:text-popover-foreground"
+        >
+          {children}
+        </select>
+        <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-0 size-4 -translate-y-1/2 text-white/35" />
+      </div>
+    </div>
+  );
+}
+
+function StepCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+      <div
+        className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-primary/[0.04]"
+        style={{
+          backgroundImage:
+            "radial-gradient(80% 80% at 50% 0%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 70%)",
+        }}
+      >
+        <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
+        <span className="relative flex size-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-primary">
+          {icon}
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5 border-t border-white/10 p-4">
+        <h3 className="text-sm font-semibold tracking-wide text-white uppercase">{title}</h3>
+        <p className="text-xs leading-relaxed text-white/45">{description}</p>
+      </div>
+    </div>
+  );
+}
+
 export function VideoStudio({
   initialJobs,
   initialRules,
@@ -216,6 +288,7 @@ export function VideoStudio({
   const [toDelete, setToDelete] = useState<VideoJob | null>(null);
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [rightTab, setRightTab] = useState<"history" | "how">("history");
   const submitLock = useRef(false);
   const urlsRef = useRef<string[]>([]);
 
@@ -596,6 +669,7 @@ export function VideoStudio({
 
     setPendingPrice(null);
     clearInputs();
+    setRightTab("history");
     toast.success(
       result.jobs && result.jobs.length > 1
         ? `${result.jobs.length} videos en cola.`
@@ -703,23 +777,38 @@ export function VideoStudio({
     (mode === "text" || images.length > 0) &&
     (mode !== "motion" || Boolean(motionVideo));
 
-  return (
-    <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FilmIcon className="size-4" />
-            Crear video
-          </CardTitle>
-          <CardDescription>
-            Elige el modo, describe el video y ajusta el modelo. El precio se calcula antes de
-            generar.
-          </CardDescription>
-        </CardHeader>
+  const generateLabel = isCreating
+    ? "Generando…"
+    : quote
+      ? `Generar · ${formatVnd(quote.totalAmount)}`
+      : "Generar video";
 
-        <CardContent className="flex flex-col gap-5">
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background lg:grid lg:grid-cols-[340px_minmax(0,1fr)]">
+      {/* Riel de controles */}
+      <aside className="flex max-h-[78dvh] min-h-0 flex-col border-b border-white/10 bg-[#0a0a0b] lg:max-h-none lg:border-r lg:border-b-0">
+        <nav className="flex shrink-0 items-center gap-5 overflow-x-auto border-b border-white/10 px-5">
+          {MODE_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => changeMode(tab.id)}
+              className={cn(
+                "relative shrink-0 pt-4 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
+                mode === tab.id ? "text-white" : "text-white/40 hover:text-white/75",
+              )}
+            >
+              {tab.label}
+              {mode === tab.id ? (
+                <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+              ) : null}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
           {!hasKey ? (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-500">
+            <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
               Configura tu clave de Klinggiare en{" "}
               <Link href="/ajustes" className="underline underline-offset-4">
                 Ajustes
@@ -729,405 +818,463 @@ export function VideoStudio({
           ) : null}
 
           {maintenance ? (
-            <p className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              <AlertTriangleIcon className="size-4" />
-              Klinggiare está en mantenimiento. Inténtalo más tarde.
+            <p className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              <AlertTriangleIcon className="size-3.5 shrink-0" />
+              Klinggiare está en mantenimiento.
             </p>
           ) : null}
 
           {catalogError ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-500">
-              <span className="flex-1">No se pudo cargar el catálogo: {catalogError}</span>
-              <Button variant="outline" size="xs" onClick={handleReloadCatalog}>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
+              <span className="flex-1">No se pudo cargar el catálogo.</span>
+              <button
+                type="button"
+                onClick={handleReloadCatalog}
+                className="rounded-md border border-white/15 px-2 py-0.5 text-[11px] text-white/80 hover:bg-white/10"
+              >
                 Reintentar
-              </Button>
+              </button>
             </div>
           ) : null}
 
           {pendingPrice ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-500">
-              <span className="flex-1">
+            <div className="flex flex-col gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
+              <span>
                 El precio cambió a {formatVnd(pendingPrice.quote.totalAmount)} para{" "}
-                {pendingPrice.quote.imageCount} video(s). Confirma para continuar.
+                {pendingPrice.quote.imageCount} video(s).
               </span>
-              <Button size="xs" onClick={handleConfirmPrice} disabled={isCreating}>
+              <Button
+                size="sm"
+                onClick={handleConfirmPrice}
+                disabled={isCreating}
+                className="w-full"
+              >
                 {isCreating ? <Loader2Icon className="animate-spin" /> : <CheckIcon />}
-                Confirmar
+                Confirmar y generar
               </Button>
             </div>
           ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label>Modo</Label>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={mode === "text" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => changeMode("text")}
-                  >
-                    Texto
-                  </Button>
-                  <Button
-                    variant={mode === "image" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => changeMode("image")}
-                  >
-                    Imagen
-                  </Button>
-                  <Button
-                    variant={mode === "motion" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => changeMode("motion")}
-                  >
-                    Motion Control
-                  </Button>
-                </div>
-              </div>
+          {/* Referencias */}
+          <div className="flex flex-col gap-2.5">
+            <span className="text-[10px] font-medium tracking-[0.14em] text-white/35 uppercase">
+              Referencias
+            </span>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="video-provider">Proveedor</Label>
-                <NativeSelect
-                  id="video-provider"
-                  value={provider}
-                  onChange={(event) =>
-                    setProvider(event.target.value as VideoProviderId)
-                  }
-                >
-                  {VIDEO_PROVIDERS.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))}
-                </NativeSelect>
-                {keySource === "env" ? (
-                  <p className="text-xs text-muted-foreground">
-                    Clave tomada de la variable de entorno KLING_API_KEY.
-                  </p>
+            {mode === "text" ? (
+              <p className="rounded-xl border border-dashed border-white/10 px-3 py-4 text-center text-xs text-white/35">
+                El modo texto no necesita referencias.
+              </p>
+            ) : (
+              <>
+                {images.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {images.map((item, index) => (
+                      <div key={`${item.file.name}-${index}`} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.url}
+                          alt={item.file.name}
+                          className="size-14 rounded-lg border border-white/10 object-cover"
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Quitar ${item.file.name}`}
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-1.5 -right-1.5 rounded-full border border-white/15 bg-[#141416] p-0.5 text-white/60 hover:text-white"
+                        >
+                          <XIcon className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 ) : null}
-              </div>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="video-prompt">Prompt</Label>
-                <Textarea
-                  id="video-prompt"
-                  value={prompt}
-                  onChange={(event) => {
-                    setPrompt(event.target.value);
-                    setPendingPrice(null);
-                  }}
-                  placeholder="Describe el video: cámara, movimiento, iluminación, estilo…"
-                  className="min-h-24"
-                />
-              </div>
-
-              {mode !== "text" ? (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="video-images">
-                    {mode === "motion" ? "Imágenes del personaje" : "Imágenes"}
-                  </Label>
-                  <Input
-                    id="video-images"
+                <label className="group flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-white/12 bg-white/[0.02] px-3 py-5 text-center transition-colors hover:border-primary/40 hover:bg-white/[0.04]">
+                  <input
                     type="file"
                     multiple
                     accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
                     onChange={(event) => {
                       handleImages(event.target.files);
                       event.target.value = "";
                     }}
                   />
-                  {images.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {images.map((item, index) => (
-                        <div key={`${item.file.name}-${index}`} className="relative">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <ImagePlusIcon className="size-5 text-white/35 group-hover:text-primary" />
+                  <span className="text-sm font-medium text-white/80">
+                    {mode === "motion" ? "Añadir personaje" : "Añadir imágenes"}
+                  </span>
+                  <span className="text-[11px] text-white/35">
+                    {mode === "motion"
+                      ? "Imagen del personaje · JPEG, PNG, WebP o GIF"
+                      : "Una imagen = un video · máx. 100"}
+                  </span>
+                </label>
+
+                {mode === "image" ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-white/50">
+                        {endFrame ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={item.url}
-                            alt={item.file.name}
-                            className="size-16 rounded-md border border-border/60 object-cover"
+                            src={endFrame.url}
+                            alt={endFrame.file.name}
+                            className="size-8 rounded-lg object-cover"
                           />
-                          <button
-                            type="button"
-                            aria-label={`Quitar ${item.file.name}`}
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-1.5 -right-1.5 rounded-full border border-border/60 bg-background p-0.5 text-muted-foreground hover:text-foreground"
-                          >
-                            <XIcon className="size-3" />
-                          </button>
-                        </div>
-                      ))}
+                        ) : (
+                          <FilmIcon className="size-4" />
+                        )}
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-xs font-medium text-white/80">
+                          Imagen final
+                        </span>
+                        <span className="truncate text-[11px] text-white/35">
+                          {endFrame ? endFrame.file.name : "Opcional · primer y último frame"}
+                        </span>
+                      </div>
+                      {endFrame ? (
+                        <button
+                          type="button"
+                          aria-label="Quitar imagen final"
+                          onClick={clearEndFrame}
+                          className="rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white"
+                        >
+                          <XIcon className="size-3.5" />
+                        </button>
+                      ) : (
+                        <label className="cursor-pointer rounded-md border border-white/15 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10">
+                          Subir
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            onChange={(event) => {
+                              handleEndFrame(event.target.files);
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
                     </div>
-                  ) : null}
-                  {mode === "image" ? (
-                    <p className="text-xs text-muted-foreground">
-                      Cada imagen genera un video. Máximo 100.
-                    </p>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
+
+                {mode === "motion" ? (
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.05] text-white/50">
+                        <VideoIcon className="size-4" />
+                      </span>
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-xs font-medium text-white/80">
+                          Video de referencia
+                        </span>
+                        <span className="truncate text-[11px] text-white/35">
+                          {motionVideo
+                            ? `${motionVideo.name} · ${formatBytes(motionVideo.size)}`
+                            : "2,5–13 s · máx. 100 MB"}
+                        </span>
+                      </div>
+                      <label className="cursor-pointer rounded-md border border-white/15 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10">
+                        {motionVideo ? "Cambiar" : "Subir"}
+                        <input
+                          type="file"
+                          accept="video/mp4,video/quicktime,video/webm"
+                          className="hidden"
+                          onChange={(event) => {
+                            handleMotionVideo(event.target.files);
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          {/* Prompt */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[10px] font-medium tracking-[0.14em] text-white/35 uppercase">
+              Prompt
+            </span>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 transition-colors focus-within:border-primary/40">
+              <Textarea
+                id="video-prompt"
+                value={prompt}
+                onChange={(event) => {
+                  setPrompt(event.target.value);
+                  setPendingPrice(null);
+                }}
+                placeholder="Describe el cambio visual que quieres: cámara, luz, acción, estilo…"
+                className="min-h-24 resize-none border-0 bg-transparent p-0 text-sm shadow-none placeholder:text-white/25 focus-visible:ring-0"
+              />
+              <div className="mt-2 flex items-center justify-between text-[11px] text-white/30">
+                <span>Sin límite práctico · sé específico</span>
+                <span>{prompt.length}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Ajustes */}
+          <div className="flex flex-col gap-3">
+            <FieldSelect
+              label="Proveedor"
+              value={provider}
+              onChange={(event) => setProvider(event.target.value as VideoProviderId)}
+            >
+              {VIDEO_PROVIDERS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </FieldSelect>
+
+            <FieldSelect
+              label="Modelo"
+              value={effectiveSettings.model}
+              onChange={(event) => updateSettings({ model: event.target.value })}
+              disabled={models.length === 0}
+            >
+              {models.length === 0 ? <option value="">Sin modelos</option> : null}
+              {models.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </FieldSelect>
+
+            <div className="grid grid-cols-2 gap-3">
+              {mode !== "motion" ? (
+                <FieldSelect
+                  label="Duración"
+                  value={String(effectiveSettings.durationSeconds)}
+                  onChange={(event) =>
+                    updateSettings({ durationSeconds: Number(event.target.value) })
+                  }
+                  disabled={durations.length === 0}
+                >
+                  {durations.map((duration) => (
+                    <option key={duration} value={duration}>
+                      {duration} s
+                    </option>
+                  ))}
+                </FieldSelect>
               ) : null}
 
-              {mode === "image" ? (
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="video-endframe">Imagen final (opcional)</Label>
-                  <Input
-                    id="video-endframe"
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={(event) => {
-                      handleEndFrame(event.target.files);
-                      event.target.value = "";
-                    }}
-                  />
-                  {endFrame ? (
-                    <div className="relative w-fit">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={endFrame.url}
-                        alt={endFrame.file.name}
-                        className="size-16 rounded-md border border-border/60 object-cover"
-                      />
-                      <button
-                        type="button"
-                        aria-label="Quitar imagen final"
-                        onClick={clearEndFrame}
-                        className="absolute -top-1.5 -right-1.5 rounded-full border border-border/60 bg-background p-0.5 text-muted-foreground hover:text-foreground"
-                      >
-                        <XIcon className="size-3" />
-                      </button>
-                    </div>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    Con imagen final, el video interpola desde la primera imagen hasta esta.
-                  </p>
-                </div>
-              ) : null}
+              <FieldSelect
+                label="Aspecto"
+                value={effectiveSettings.aspectRatio}
+                onChange={(event) => updateSettings({ aspectRatio: event.target.value })}
+                disabled={aspects.length === 0}
+              >
+                {aspects.map((aspect) => (
+                  <option key={aspect} value={aspect}>
+                    {aspect}
+                  </option>
+                ))}
+              </FieldSelect>
+
+              <FieldSelect
+                label="Resolución"
+                value={effectiveSettings.resolution}
+                onChange={(event) =>
+                  updateSettings({
+                    resolution: event.target.value as VideoSettings["resolution"],
+                  })
+                }
+                disabled={resolutions.length === 0}
+              >
+                {resolutions.map((resolution) => (
+                  <option key={resolution} value={resolution}>
+                    {resolution}
+                  </option>
+                ))}
+              </FieldSelect>
 
               {mode === "motion" ? (
                 <>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="video-motion">Video de muestra (2,5–13 s, máx. 100 MB)</Label>
-                    <Input
-                      id="video-motion"
-                      type="file"
-                      accept="video/mp4,video/quicktime,video/webm"
-                      onChange={(event) => {
-                        handleMotionVideo(event.target.files);
-                        event.target.value = "";
-                      }}
-                    />
-                    {motionVideo ? (
-                      <p className="text-xs text-muted-foreground">
-                        {motionVideo.name} · {formatBytes(motionVideo.size)}
-                      </p>
-                    ) : null}
-                  </div>
+                  <FieldSelect
+                    label="Encuadre"
+                    value={motionOrientation}
+                    onChange={(event) =>
+                      setMotionOrientation(event.target.value as "FULL" | "HALF")
+                    }
+                  >
+                    <option value="FULL">Cuerpo completo</option>
+                    <option value="HALF">Medio cuerpo</option>
+                  </FieldSelect>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="video-orientation">Encuadre</Label>
-                      <NativeSelect
-                        id="video-orientation"
-                        value={motionOrientation}
-                        onChange={(event) =>
-                          setMotionOrientation(event.target.value as "FULL" | "HALF")
-                        }
-                      >
-                        <option value="FULL">Cuerpo completo</option>
-                        <option value="HALF">Medio cuerpo</option>
-                      </NativeSelect>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="video-sound">Sonido original</Label>
-                      <NativeSelect
-                        id="video-sound"
-                        value={keepOriginalSound ? "1" : "0"}
-                        onChange={(event) => setKeepOriginalSound(event.target.value === "1")}
-                      >
-                        <option value="1">Conservar</option>
-                        <option value="0">Silenciar</option>
-                      </NativeSelect>
-                    </div>
-                  </div>
+                  <FieldSelect
+                    label="Sonido original"
+                    value={keepOriginalSound ? "1" : "0"}
+                    onChange={(event) => setKeepOriginalSound(event.target.value === "1")}
+                  >
+                    <option value="1">Conservar</option>
+                    <option value="0">Silenciar</option>
+                  </FieldSelect>
                 </>
+              ) : (
+                <FieldSelect
+                  label="Audio"
+                  value={effectiveSettings.audio ? "1" : "0"}
+                  onChange={(event) => updateSettings({ audio: event.target.value === "1" })}
+                  disabled={audioOptions.length <= 1}
+                >
+                  {audioOptions.map((option) => (
+                    <option key={String(option)} value={option ? "1" : "0"}>
+                      {option ? "Con audio" : "Sin audio"}
+                    </option>
+                  ))}
+                </FieldSelect>
+              )}
+            </div>
+
+            {keySource === "env" ? (
+              <p className="text-[11px] text-white/30">
+                Clave tomada de la variable de entorno KLING_API_KEY.
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Precio y acción */}
+        <div className="shrink-0 border-t border-white/10 bg-[#0a0a0b] p-4">
+          <div className="mb-3 flex items-start justify-between gap-2 text-xs">
+            <span className="text-white/40">Precio estimado</span>
+            <div className="flex flex-col items-end">
+              {priceVisible && quoteLoading ? (
+                <Loader2Icon className="size-4 animate-spin text-white/50" />
+              ) : priceVisible && quote ? (
+                <span className="text-sm font-semibold text-white">
+                  {formatVnd(quote.totalAmount)}
+                </span>
+              ) : (
+                <span className="text-white/30">—</span>
+              )}
+              {priceVisible && quote ? (
+                <span className="text-[11px] text-white/35">
+                  {quote.imageCount} video(s) · {formatVnd(quote.perVideoAmount)} c/u
+                </span>
               ) : null}
             </div>
-
-            <div className="flex flex-col gap-3">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="video-model">Modelo</Label>
-                  <NativeSelect
-                    id="video-model"
-                    value={effectiveSettings.model}
-                    disabled={models.length === 0}
-                    onChange={(event) => updateSettings({ model: event.target.value })}
-                  >
-                    {models.length === 0 ? <option value="">Sin modelos</option> : null}
-                    {models.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-
-                {mode !== "motion" ? (
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="video-duration">Duración</Label>
-                    <NativeSelect
-                      id="video-duration"
-                      value={String(effectiveSettings.durationSeconds)}
-                      disabled={durations.length === 0}
-                      onChange={(event) =>
-                        updateSettings({ durationSeconds: Number(event.target.value) })
-                      }
-                    >
-                      {durations.map((duration) => (
-                        <option key={duration} value={duration}>
-                          {duration} s
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </div>
-                ) : null}
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="video-resolution">Resolución</Label>
-                  <NativeSelect
-                    id="video-resolution"
-                    value={effectiveSettings.resolution}
-                    disabled={resolutions.length === 0}
-                    onChange={(event) =>
-                      updateSettings({
-                        resolution: event.target.value as VideoSettings["resolution"],
-                      })
-                    }
-                  >
-                    {resolutions.map((resolution) => (
-                      <option key={resolution} value={resolution}>
-                        {resolution}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="video-aspect">Aspecto</Label>
-                  <NativeSelect
-                    id="video-aspect"
-                    value={effectiveSettings.aspectRatio}
-                    disabled={aspects.length === 0}
-                    onChange={(event) => updateSettings({ aspectRatio: event.target.value })}
-                  >
-                    {aspects.map((aspect) => (
-                      <option key={aspect} value={aspect}>
-                        {aspect}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="video-audio">Audio</Label>
-                  <NativeSelect
-                    id="video-audio"
-                    value={effectiveSettings.audio ? "1" : "0"}
-                    disabled={audioOptions.length <= 1}
-                    onChange={(event) =>
-                      updateSettings({ audio: event.target.value === "1" })
-                    }
-                  >
-                    {audioOptions.map((option) => (
-                      <option key={String(option)} value={option ? "1" : "0"}>
-                        {option ? "Con audio" : "Sin audio"}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border/60 bg-muted/40 p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Precio estimado</span>
-                  {priceVisible && quoteLoading ? (
-                    <Loader2Icon className="size-4 animate-spin" />
-                  ) : priceVisible && quote ? (
-                    <span className="font-heading text-base font-semibold">
-                      {formatVnd(quote.totalAmount)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </div>
-
-                {priceVisible && quote ? (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {quote.imageCount} video(s) · {formatVnd(quote.perVideoAmount)} c/u
-                  </p>
-                ) : null}
-
-                {priceVisible && quote?.discount ? (
-                  <p className="mt-1 text-xs text-primary">{discountLabel(quote.discount)}</p>
-                ) : null}
-
-                {derivedQuoteError ? (
-                  <p className="mt-1 text-xs text-destructive">{derivedQuoteError}</p>
-                ) : null}
-              </div>
-
-              <Button onClick={handleGenerate} disabled={!canGenerate} className="w-full">
-                {isCreating ? (
-                  <Loader2Icon className="animate-spin" />
-                ) : (
-                  <SparklesIcon />
-                )}
-                {isCreating ? "Generando…" : "Generar video"}
-              </Button>
-            </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-heading text-lg font-semibold">Videos generados</h2>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <WalletIcon className="size-3.5" />
-          {!hasKey
-            ? "Sin clave configurada"
-            : wallet
-              ? `Saldo: ${formatVnd(wallet.balance)}${
-                  wallet.heldReserve > 0 ? ` · retenido ${formatVnd(wallet.heldReserve)}` : ""
-                }`
-              : (walletError ?? "Saldo no disponible")}
-        </div>
-      </div>
+          {priceVisible && quote?.discount ? (
+            <p className="mb-2 text-[11px] text-primary">{discountLabel(quote.discount)}</p>
+          ) : null}
 
-      {jobs.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-            <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <FilmIcon className="size-5" />
-            </span>
-            <p className="font-medium">Todavía no has generado ningún video</p>
-            <p className="max-w-sm text-sm text-muted-foreground">
-              Escribe un prompt, sube imágenes o usa Motion Control y pulsa «Generar video».
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {jobs.map((job) => (
-            <VideoJobCard
-              key={job.id}
-              job={job}
-              isPending={pendingId === job.id}
-              onDelete={setToDelete}
-              onRetryDownload={handleRetryDownload}
-            />
-          ))}
+          {derivedQuoteError ? (
+            <p className="mb-2 text-[11px] text-red-400">{derivedQuoteError}</p>
+          ) : null}
+
+          <Button
+            onClick={handleGenerate}
+            disabled={!canGenerate}
+            className="h-11 w-full rounded-xl text-sm font-semibold disabled:bg-white/10 disabled:text-white/35 disabled:shadow-none"
+          >
+            {isCreating ? <Loader2Icon className="animate-spin" /> : <SparklesIcon />}
+            {generateLabel}
+          </Button>
         </div>
-      )}
+      </aside>
+
+      {/* Lienzo */}
+      <section className="flex min-h-0 flex-1 flex-col">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+          <div className="inline-flex rounded-xl border border-white/10 bg-white/[0.04] p-1">
+            <button
+              type="button"
+              onClick={() => setRightTab("history")}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                rightTab === "history"
+                  ? "bg-white/10 text-white"
+                  : "text-white/45 hover:text-white/80",
+              )}
+            >
+              Historial
+            </button>
+            <button
+              type="button"
+              onClick={() => setRightTab("how")}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                rightTab === "how"
+                  ? "bg-white/10 text-white"
+                  : "text-white/45 hover:text-white/80",
+              )}
+            >
+              Cómo funciona
+            </button>
+          </div>
+
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/50">
+            <WalletIcon className="size-3.5" />
+            {!hasKey
+              ? "Sin clave"
+              : wallet
+                ? `Saldo ${formatVnd(wallet.balance)}${
+                    wallet.heldReserve > 0
+                      ? ` · retenido ${formatVnd(wallet.heldReserve)}`
+                      : ""
+                  }`
+                : (walletError ?? "Saldo no disponible")}
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {rightTab === "how" || jobs.length === 0 ? (
+            <div className="flex flex-col gap-8 px-6 py-10 sm:px-10">
+              <div className="max-w-3xl">
+                <h1 className="font-heading text-3xl font-bold tracking-tight text-white uppercase sm:text-5xl">
+                  {jobs.length === 0 && rightTab === "history"
+                    ? "Genera videos en un clic"
+                    : "Cómo funciona"}
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/45">
+                  Elige un modo, añade referencias, ajusta el modelo y genera. Cada imagen
+                  produce un video; el precio se calcula antes de empezar.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <StepCard
+                  icon={<ImagePlusIcon className="size-6" />}
+                  title="1 · Añade referencias"
+                  description="Sube una o varias imágenes para imagen a video, o un video de muestra para Motion Control. En texto puedes empezar sin archivos."
+                />
+                <StepCard
+                  icon={<SlidersHorizontalIcon className="size-6" />}
+                  title="2 · Ajusta la generación"
+                  description="Elige modelo, duración, aspecto, resolución y audio. Verás el precio estimado actualizarse en el riel izquierdo."
+                />
+                <StepCard
+                  icon={<PlayIcon className="size-6" />}
+                  title="3 · Genera y descarga"
+                  description="El video se procesa en el proveedor y aparece en el historial. Se guarda en tu servidor para reproducirlo y descargarlo cuando quieras."
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
+              {jobs.map((job) => (
+                <VideoJobCard
+                  key={job.id}
+                  job={job}
+                  isPending={pendingId === job.id}
+                  onDelete={setToDelete}
+                  onRetryDownload={handleRetryDownload}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       <AlertDialog
         open={toDelete !== null}
