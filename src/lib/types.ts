@@ -242,7 +242,7 @@ export interface VideoSettings {
   model: string;
   durationSeconds: number;
   aspectRatio: string;
-  resolution: "480p" | "720p" | "1080p" | "4k";
+  resolution: "480p" | "720p" | "768p" | "1080p" | "4k";
   audio: boolean;
 }
 

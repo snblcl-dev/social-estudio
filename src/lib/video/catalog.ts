@@ -2,7 +2,7 @@ import type { VideoMode, VideoPriceRule } from "@/lib/types";
 
 export const COMMON_ASPECT_RATIOS = ["9:16", "16:9", "1:1"];
 
-const RESOLUTION_ORDER = ["480p", "720p", "1080p", "4k"];
+const RESOLUTION_ORDER = ["480p", "720p", "768p", "1080p", "4k"];
 
 function unique<T>(values: T[]): T[] {
   return Array.from(new Set(values));

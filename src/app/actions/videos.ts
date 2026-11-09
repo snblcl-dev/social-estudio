@@ -47,7 +47,7 @@ const settingsSchema = z.object({
   model: z.string().trim().min(1).max(80),
   durationSeconds: z.number().int().min(0).max(60),
   aspectRatio: z.string().trim().min(1).max(20),
-  resolution: z.enum(["480p", "720p", "1080p", "4k"]),
+  resolution: z.enum(["480p", "720p", "768p", "1080p", "4k"]),
   audio: z.boolean(),
 });
 
