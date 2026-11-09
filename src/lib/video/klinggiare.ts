@@ -419,7 +419,7 @@ async function createBatch(
 
 async function getJob(apiKey: string, jobId: string): Promise<VideoProviderJob> {
   const data = await request<RawJob>(
-    `/v1/ai/ext/jobs/${encodeURIComponent(jobId)}`,
+    `/api/v1/ext/jobs/${encodeURIComponent(jobId)}`,
     { apiKey },
   );
   return mapJob(data);
@@ -430,7 +430,7 @@ async function listJobsByBatch(
   batchId: string,
 ): Promise<VideoProviderJob[]> {
   const data = await request<{ items?: RawJob[] }>(
-    `/v1/ai/ext/jobs?batchId=${encodeURIComponent(batchId)}&pageSize=100`,
+    `/api/v1/ext/jobs?batchId=${encodeURIComponent(batchId)}&pageSize=100`,
     { apiKey },
   );
 
@@ -439,7 +439,7 @@ async function listJobsByBatch(
 
 async function getVideoUrl(apiKey: string, jobId: string): Promise<string> {
   const data = await request<{ url?: string }>(
-    `/v1/ai/ext/jobs/${encodeURIComponent(jobId)}/video-url`,
+    `/api/v1/ext/jobs/${encodeURIComponent(jobId)}/video-url`,
     { apiKey, attempts: 2 },
   );
 
