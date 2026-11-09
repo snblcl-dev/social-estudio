@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { listVoiceoversForScript } from "@/lib/data/vibi";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { deleteVoiceAudio } from "@/lib/voice-storage";
 
 const imagePromptSchema = z.object({
   index: z.number().int().nonnegative(),
@@ -123,7 +125,9 @@ export async function deleteScript(id: string): Promise<ActionResult> {
   if (!user) return { error: "No autenticado." };
 
   try {
+    const voiceovers = await listVoiceoversForScript(user.id, id);
     await prisma.script.deleteMany({ where: { id, user_id: user.id } });
+    await Promise.all(voiceovers.map((voiceover) => deleteVoiceAudio(voiceover.id)));
   } catch (error) {
     return { error: errorMessage(error) };
   }

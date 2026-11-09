@@ -30,27 +30,30 @@ import type {
   Script,
   VibiLanguage,
   VibiModel,
-  VibiProvider,
   VibiVoice,
   Voiceover,
+  VoiceProvider,
 } from "@/lib/types";
 
-const VIBI_PROVIDERS: { id: VibiProvider; label: string }[] = [
+const VOICE_PROVIDERS: { id: VoiceProvider; label: string }[] = [
   { id: "elevenlabs", label: "ElevenLabs" },
   { id: "minimax", label: "MiniMax" },
   { id: "capcut", label: "CapCut" },
+  { id: "fishaudio", label: "Fish Audio" },
 ];
 
-const DEFAULT_LANGUAGE: Record<VibiProvider, string> = {
+const DEFAULT_LANGUAGE: Record<VoiceProvider, string> = {
   elevenlabs: "es",
   minimax: "Spanish",
   capcut: "es",
+  fishaudio: "es",
 };
 
-const DEFAULT_MODEL: Record<VibiProvider, string> = {
+const DEFAULT_MODEL: Record<VoiceProvider, string> = {
   elevenlabs: "eleven_multilingual_v2",
   minimax: "speech-2.8-turbo",
   capcut: "",
+  fishaudio: "s2.1-pro-free",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -65,6 +68,7 @@ interface VoiceoverDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   hasVibiKey: boolean;
+  hasFishKey: boolean;
 }
 
 export function VoiceoverDialog({
@@ -72,8 +76,9 @@ export function VoiceoverDialog({
   open,
   onOpenChange,
   hasVibiKey,
+  hasFishKey,
 }: VoiceoverDialogProps) {
-  const [provider, setProvider] = useState<VibiProvider>("elevenlabs");
+  const [provider, setProvider] = useState<VoiceProvider>("elevenlabs");
   const [voices, setVoices] = useState<VibiVoice[]>([]);
   const [languages, setLanguages] = useState<VibiLanguage[]>([]);
   const [models, setModels] = useState<VibiModel[]>([]);
@@ -89,11 +94,14 @@ export function VoiceoverDialog({
   const [toDelete, setToDelete] = useState<Voiceover | null>(null);
   const [, startTransition] = useTransition();
 
+  const providerHasKey = provider === "fishaudio" ? hasFishKey : hasVibiKey;
+
   const filteredVoices = useMemo(() => {
+    if (provider === "fishaudio") return voices;
     const term = voiceSearch.trim().toLowerCase();
     if (!term) return voices;
     return voices.filter((voice) => voice.name.toLowerCase().includes(term));
-  }, [voices, voiceSearch]);
+  }, [provider, voices, voiceSearch]);
 
   // Carga los audios ya generados del guion.
   useEffect(() => {
@@ -111,7 +119,7 @@ export function VoiceoverDialog({
 
   const loadingCatalog = catalogProvider !== provider;
 
-  function handleProviderChange(next: VibiProvider) {
+  function handleProviderChange(next: VoiceProvider) {
     setProvider(next);
     setVoiceId("");
     setVoiceSearch("");
@@ -119,36 +127,90 @@ export function VoiceoverDialog({
     setModelId(DEFAULT_MODEL[next]);
   }
 
-  // Carga voces, idiomas y modelos del proveedor.
+  // Carga idiomas y modelos del proveedor (y las voces de Vibi).
   useEffect(() => {
-    if (!open || !script || !hasVibiKey) return;
-    let active = true;
+    if (!open || !script) return;
+    const hasKey = provider === "fishaudio" ? hasFishKey : hasVibiKey;
+    if (!hasKey) return;
 
-    const base = `/api/vibi/catalog?provider=${provider}`;
+    let active = true;
+    const isFish = provider === "fishaudio";
+    const base = isFish
+      ? "/api/fish/catalog"
+      : `/api/vibi/catalog?provider=${provider}`;
+    const voicesUrl = isFish ? `${base}?kind=voices` : `${base}&kind=voices`;
+    const languagesUrl = isFish ? `${base}?kind=languages` : `${base}&kind=languages`;
+    const modelsUrl = isFish ? `${base}?kind=models` : `${base}&kind=models`;
+
+    const voiceItems: Promise<VibiVoice[]> = isFish
+      ? Promise.resolve([])
+      : fetch(voicesUrl)
+          .then((response) => response.json())
+          .then((data: { items?: VibiVoice[] }) => data.items ?? []);
 
     Promise.all([
-      fetch(`${base}&kind=voices`).then((response) => response.json()),
-      fetch(`${base}&kind=languages`).then((response) => response.json()),
-      fetch(`${base}&kind=models`).then((response) => response.json()),
+      voiceItems,
+      fetch(languagesUrl).then((response) => response.json()),
+      fetch(modelsUrl).then((response) => response.json()),
     ])
-      .then(([voicesData, languagesData, modelsData]) => {
+      .then(([nextVoices, languagesData, modelsData]) => {
         if (!active) return;
 
-        const nextVoices: VibiVoice[] = voicesData.items ?? [];
-        setVoices(nextVoices);
+        if (!isFish) {
+          setVoices(nextVoices);
+          setVoiceId((current) => current || nextVoices[0]?.voice_id || "");
+        }
         setLanguages(languagesData.items ?? []);
         setModels(modelsData.items ?? []);
-        setVoiceId((current) => current || nextVoices[0]?.voice_id || "");
         setCatalogProvider(provider);
       })
       .catch(() => {
-        if (active) toast.error("No se pudieron cargar las voces de Vibi.");
+        if (active) toast.error("No se pudieron cargar las voces.");
       });
 
     return () => {
       active = false;
     };
-  }, [open, script, provider, hasVibiKey]);
+  }, [open, script, provider, hasVibiKey, hasFishKey]);
+
+  // Busca voces en Fish Audio (propias + biblioteca pública) con un pequeño retardo.
+  useEffect(() => {
+    if (!open || !script || provider !== "fishaudio" || !hasFishKey) return;
+
+    let active = true;
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams({ kind: "voices" });
+      const term = voiceSearch.trim();
+      if (term) params.set("search", term);
+
+      fetch(`/api/fish/catalog?${params.toString()}`)
+        .then((response) => response.json())
+        .then((data: { items?: VibiVoice[]; error?: string }) => {
+          if (!active) return;
+          if (data.error) {
+            toast.error(data.error);
+            return;
+          }
+
+          const nextVoices = data.items ?? [];
+          setVoices(nextVoices);
+          setVoiceId((current) =>
+            nextVoices.some((voice) => voice.voice_id === current)
+              ? current
+              : (nextVoices[0]?.voice_id ?? ""),
+          );
+          setCatalogProvider("fishaudio");
+        })
+        .catch(() => {
+          if (active) toast.error("No se pudieron cargar las voces de Fish Audio.");
+        });
+    }, 400);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [open, script, provider, hasFishKey, voiceSearch]);
 
   // Sondea el estado de la tarea activa.
   useEffect(() => {
@@ -246,9 +308,11 @@ export function VoiceoverDialog({
         </DialogHeader>
 
         <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto pr-1">
-          {!hasVibiKey ? (
+          {!providerHasKey ? (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-500">
-              Configura tu clave de Vibi en Ajustes para generar la voz de los guiones.
+              {provider === "fishaudio"
+                ? "Configura tu clave de Fish Audio en Ajustes para generar la voz de los guiones."
+                : "Configura tu clave de Vibi en Ajustes para generar la voz de los guiones."}
             </p>
           ) : (
             <div className="flex flex-col gap-4 rounded-lg border border-border/60 bg-muted/30 p-4">
@@ -259,10 +323,10 @@ export function VoiceoverDialog({
                     id="voiceover-provider"
                     value={provider}
                     onChange={(event) =>
-                      handleProviderChange(event.target.value as VibiProvider)
+                      handleProviderChange(event.target.value as VoiceProvider)
                     }
                   >
-                    {VIBI_PROVIDERS.map((item) => (
+                    {VOICE_PROVIDERS.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.label}
                       </option>
@@ -390,7 +454,7 @@ export function VoiceoverDialog({
                       {STATUS_LABEL[voiceover.status] ?? voiceover.status}
                     </Badge>
                     <span className="text-muted-foreground">
-                      {VIBI_PROVIDERS.find((item) => item.id === voiceover.provider)?.label ??
+                      {VOICE_PROVIDERS.find((item) => item.id === voiceover.provider)?.label ??
                         voiceover.provider}{" "}
                       · {voiceover.voice_id}
                     </span>
@@ -426,7 +490,11 @@ export function VoiceoverDialog({
                     <div className="flex flex-col gap-2">
                       <audio controls src={voiceover.audio_url} className="w-full" />
                       <a
-                        href={voiceover.audio_url}
+                        href={
+                          voiceover.audio_url.startsWith("/")
+                            ? `${voiceover.audio_url}?download=1`
+                            : voiceover.audio_url
+                        }
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex w-fit items-center gap-1.5 text-xs text-primary underline underline-offset-4"
@@ -453,7 +521,7 @@ export function VoiceoverDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar el audio?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se quitará este audio generado. La tarea seguirá existiendo en Vibi.
+              Se quitará este audio generado del historial.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

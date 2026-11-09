@@ -164,6 +164,9 @@ export interface ProviderOption {
 /** Motor de voz de Vibi. */
 export type VibiProvider = "elevenlabs" | "minimax" | "capcut";
 
+/** Motor de voz usado para generar la locución de un guion. */
+export type VoiceProvider = VibiProvider | "fishaudio";
+
 export interface VibiVoice {
   voice_id: string;
   name: string;
@@ -192,7 +195,7 @@ export interface Voiceover {
   user_id: string;
   script_id: string | null;
   task_id: string;
-  provider: VibiProvider;
+  provider: VoiceProvider;
   voice_id: string;
   model_id: string;
   language_code: string;

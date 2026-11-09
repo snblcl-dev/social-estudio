@@ -1,6 +1,7 @@
 import { NewScriptDialog } from "@/components/scripts/new-script-dialog";
 import { ScriptsList } from "@/components/scripts/scripts-list";
 import { PageHeader } from "@/components/page-header";
+import { getFishKeySummary } from "@/lib/data/fish";
 import { listProfiles } from "@/lib/data/profiles";
 import { listScripts } from "@/lib/data/scripts";
 import { getVibiKeySummary } from "@/lib/data/vibi";
@@ -13,10 +14,11 @@ export default async function ScriptsPage() {
     return null;
   }
 
-  const [scripts, profiles, vibiKey] = await Promise.all([
+  const [scripts, profiles, vibiKey, fishKey] = await Promise.all([
     listScripts(user.id),
     listProfiles(user.id),
     getVibiKeySummary(user.id),
+    getFishKeySummary(user.id),
   ]);
 
   return (
@@ -27,7 +29,12 @@ export default async function ScriptsPage() {
         actions={<NewScriptDialog />}
       />
 
-      <ScriptsList scripts={scripts} profiles={profiles} hasVibiKey={Boolean(vibiKey)} />
+      <ScriptsList
+        scripts={scripts}
+        profiles={profiles}
+        hasVibiKey={Boolean(vibiKey)}
+        hasFishKey={Boolean(fishKey)}
+      />
     </div>
   );
 }

@@ -39,6 +39,7 @@ interface ScriptsListProps {
   scripts: Script[];
   profiles: Profile[];
   hasVibiKey: boolean;
+  hasFishKey: boolean;
 }
 
 async function copyToClipboard(value: string, label: string) {
@@ -50,7 +51,7 @@ async function copyToClipboard(value: string, label: string) {
   }
 }
 
-export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps) {
+export function ScriptsList({ scripts, profiles, hasVibiKey, hasFishKey }: ScriptsListProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [openScript, setOpenScript] = useState<Script | null>(null);
@@ -315,6 +316,7 @@ export function ScriptsList({ scripts, profiles, hasVibiKey }: ScriptsListProps)
           if (!open) setVoiceoverScript(null);
         }}
         hasVibiKey={hasVibiKey}
+        hasFishKey={hasFishKey}
       />
 
       <AlertDialog

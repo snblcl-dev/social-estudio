@@ -1,10 +1,12 @@
 import { ApiKeysPanel } from "@/components/settings/api-keys-panel";
 import { CustomProvidersPanel } from "@/components/settings/custom-providers-panel";
+import { FishPanel } from "@/components/settings/fish-panel";
 import { ManualModelsPanel } from "@/components/settings/manual-models-panel";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { VibiPanel } from "@/components/settings/vibi-panel";
 import { PageHeader } from "@/components/page-header";
 import { listCustomModels, listCustomProviders } from "@/lib/data/custom-providers";
+import { getFishKeySummary } from "@/lib/data/fish";
 import { getSettings, listApiKeySummaries } from "@/lib/data/settings";
 import { getVibiKeySummary } from "@/lib/data/vibi";
 import { listProviderOptions } from "@/lib/providers-server";
@@ -18,7 +20,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [settings, keys, providerOptions, customProviders, customModels, vibiKey] =
+  const [settings, keys, providerOptions, customProviders, customModels, vibiKey, fishKey] =
     await Promise.all([
       getSettings(user.id),
       listApiKeySummaries(user.id),
@@ -26,6 +28,7 @@ export default async function SettingsPage() {
       listCustomProviders(user.id),
       listCustomModels(user.id),
       getVibiKeySummary(user.id),
+      getFishKeySummary(user.id),
     ]);
 
   const defaultProvider: ProviderKey = providerOptions.some(
@@ -49,6 +52,8 @@ export default async function SettingsPage() {
         <ManualModelsPanel models={customModels} providerOptions={providerOptions} />
 
         <VibiPanel summary={vibiKey} />
+
+        <FishPanel summary={fishKey} />
 
         <SettingsForm
           initial={{

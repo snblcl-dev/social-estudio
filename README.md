@@ -8,7 +8,8 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
 - **Perfiles de video** (independientes de los de guion) para definir los prompts de video.
 - **Prompts de imagen** generados a partir del guion usando tus instrucciones de estilo.
 - **Guiones**: crea guiones **a mano** o guárdalos desde el chat; ver, **editar**, copiar/descargar y generar voz.
-- **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut): genera, reproduce y descarga la locución de cada guion.
+- **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut) y
+  [Fish Audio](https://fish.audio): genera, reproduce y descarga la locución de cada guion.
 - **API keys** guardadas cifradas (AES-256-GCM) en la base de datos.
 - Login de usuario único o de pocos usuarios (Better Auth, email + contraseña).
 
@@ -80,7 +81,8 @@ primera API key.
 1. **Ajustes** → pega tus API keys (OpenAI, Anthropic, Gemini, DeepSeek, OpenRouter y AIRAI) y
    elige el proveedor y modelo por defecto. También puedes **agregar proveedores
    personalizados** (cualquier endpoint compatible con OpenAI) y **modelos manuales**.
-   Guarda también tu **clave de Vibi** para generar la voz de los guiones.
+   Guarda también tu **clave de Vibi** y tu **clave de Fish Audio** para generar la voz de
+   los guiones.
 2. **Perfiles** → crea perfiles con sus instrucciones: estilo de guion, temas y **prompts de
    imagen** (aquí defines, por ejemplo, cuántas escenas quieres y el estilo visual).
    En **Perfiles de video** crea perfiles aparte con las instrucciones de **prompts de video**.
@@ -132,7 +134,8 @@ npm run create-user      # crea una cuenta de usuario
 4. Configura tu reverse proxy (Caddy/Nginx) para que `https://tu-dominio.com`
    apunte a `http://127.0.0.1:3000`.
 
-El archivo SQLite se guarda en `data/`. **Haz copias de seguridad de `data/app.db`**
+El archivo SQLite se guarda en `data/`. Los audios generados con Fish Audio se guardan en
+`data/audio/`. **Haz copias de seguridad de `data/app.db` y de `data/audio/`**
 (con la app parada o mediante `sqlite3 data/app.db ".backup backup.db"`).
 
 ## Estructura relevante

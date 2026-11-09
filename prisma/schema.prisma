@@ -118,6 +118,7 @@ model Settings {
   default_provider String   @default("openai")
   default_model    String   @default("")
   vibi_api_key     String?
+  fish_api_key     String?
   updated_at       DateTime @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
