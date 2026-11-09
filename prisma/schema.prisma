@@ -330,8 +330,8 @@ model VideoJob {
   id                 String    @id @default(uuid())
   user_id            String
   provider           String    @default("klinggiare")
-  provider_batch_id  Int?
-  provider_job_id    Int?
+  provider_batch_id  String?
+  provider_job_id    String?
   status             String    @default("queued")
   job_type           String    @default("image_to_video")
   prompt             String

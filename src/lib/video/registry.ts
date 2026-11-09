@@ -2,11 +2,13 @@ import "server-only";
 
 import { VideoApiError } from "@/lib/video/errors";
 import { klinggiareProvider } from "@/lib/video/klinggiare";
+import { magnificProvider } from "@/lib/video/magnific";
 import { VIDEO_PROVIDERS, isVideoProvider } from "@/lib/video/providers";
 import type { VideoProviderAdapter } from "@/lib/video/types";
 
 const ADAPTERS: Record<string, VideoProviderAdapter> = {
   klinggiare: klinggiareProvider,
+  magnific: magnificProvider,
 };
 
 export function getVideoProvider(id: string): VideoProviderAdapter {

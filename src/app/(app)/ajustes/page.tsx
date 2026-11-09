@@ -31,6 +31,7 @@ export default async function SettingsPage() {
     vibiKey,
     fishKey,
     videoKey,
+    magnificKey,
   ] = await Promise.all([
     getSettings(user.id),
     listApiKeySummaries(user.id),
@@ -40,6 +41,7 @@ export default async function SettingsPage() {
     getVibiKeySummary(user.id),
     getFishKeySummary(user.id),
     getVideoKeySummary(user.id, "klinggiare"),
+    getVideoKeySummary(user.id, "magnific"),
   ]);
 
   const defaultProvider: ProviderKey = providerOptions.some(
@@ -66,7 +68,42 @@ export default async function SettingsPage() {
 
         <FishPanel summary={fishKey} />
 
-        <VideoPanel summary={videoKey} />
+        <VideoPanel
+          provider="klinggiare"
+          title="Generación de video (Klinggiare)"
+          description={
+            <>
+              Genera videos con Kling a través de{" "}
+              <code className="font-mono">klinggiare.com</code>. El coste se descuenta del
+              saldo de tu wallet en el proveedor. También puedes usar la variable de entorno{" "}
+              <code className="font-mono">KLING_API_KEY</code>.
+            </>
+          }
+          keyPlaceholder="kling_sk_..."
+          envVarName="KLING_API_KEY"
+          walletLabel="Klinggiare"
+          walletSupported
+          summary={videoKey}
+        />
+
+        <VideoPanel
+          provider="magnific"
+          title="Generación de video (Magnific)"
+          description={
+            <>
+              Genera videos con los modelos Kling y Hailuo de{" "}
+              <code className="font-mono">api.magnific.com</code>. Los créditos se
+              descuentan al generar y el saldo se gestiona en el panel de Magnific. También
+              puedes usar la variable de entorno{" "}
+              <code className="font-mono">MAGNIFIC_API_KEY</code>.
+            </>
+          }
+          keyPlaceholder="Tu clave de Magnific"
+          envVarName="MAGNIFIC_API_KEY"
+          walletLabel="Magnific"
+          walletSupported={false}
+          summary={magnificKey}
+        />
 
         <SettingsForm
           initial={{

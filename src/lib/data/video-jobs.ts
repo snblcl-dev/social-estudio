@@ -68,8 +68,8 @@ export interface InsertVideoJobInput {
   id: string;
   userId: string;
   provider: string;
-  providerBatchId: number | null;
-  providerJobId: number | null;
+  providerBatchId: string | null;
+  providerJobId: string | null;
   status: string;
   jobType: VideoJobType;
   prompt: string;
@@ -131,8 +131,8 @@ export async function insertVideoJobs(
 
 export interface VideoJobUpdate {
   status?: string;
-  provider_batch_id?: number | null;
-  provider_job_id?: number | null;
+  provider_batch_id?: string | null;
+  provider_job_id?: string | null;
   thumbnail_url?: string | null;
   provider_video_url?: string | null;
   price_amount?: number | null;

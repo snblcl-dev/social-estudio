@@ -12,6 +12,8 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
   [Fish Audio](https://fish.audio): genera, reproduce y descarga la locución de cada guion.
 - **Videos** con Kling (Klinggiare): genera desde texto, una o varias imágenes, imagen
   final o Motion Control, con cotización previa, galería y descarga local de los MP4.
+- **Magnific**: modelos Kling 2.5/2.6/3.0 Turbo y Hailuo 2.3/02 para imagen→video
+  (incluida imagen final), con coste estimado en créditos.
 - **API keys** guardadas cifradas (AES-256-GCM) en la base de datos.
 - Login de usuario único o de pocos usuarios (Better Auth, email + contraseña).
 
@@ -60,9 +62,10 @@ API_KEY_ENCRYPTION_SECRET=otro-secreto-que-generaste
 - `DATABASE_URL` apunta al archivo SQLite. La ruta es relativa a `prisma/`.
 
 Opcional: `KLING_API_KEY` (clave `kling_sk_...` de
-[Klinggiare](https://klinggiare.com)) para generar videos sin guardarla en Ajustes.
-`FISH_API_BASE_URL` y `KLING_API_BASE_URL` permiten cambiar las URLs base de esos
-proveedores.
+[Klinggiare](https://klinggiare.com)) y `MAGNIFIC_API_KEY` (clave de
+[Magnific](https://www.magnific.com)) para generar videos sin guardar las claves en
+Ajustes. `FISH_API_BASE_URL`, `KLING_API_BASE_URL` y `MAGNIFIC_API_BASE_URL` permiten
+cambiar las URLs base de esos proveedores.
 
 ### 2. Base de datos y usuario
 
@@ -105,11 +108,12 @@ primera API key.
 6. **Guiones → Generar voz** convierte un guion guardado en audio con Vibi o Fish Audio
    (elige proveedor, voz, idioma y modelo). El audio se reproduce y se puede descargar
    desde la misma tarjeta.
-7. **Videos** → elige el modo (**Texto**, **Imagen** o **Motion Control**), escribe el prompt
-   y sube las imágenes o el video de muestra. Ajusta modelo, duración, resolución, aspecto
-   y audio; verás el **precio estimado** antes de generar. Cada imagen genera un video.
-   En **Imagen** puedes añadir una **imagen final** para interpolar entre la primera y la
-   última. Los videos aparecen en la galería con su estado y se pueden reproducir,
+7. **Videos** → elige el **proveedor** (Klinggiare o Magnific) y el modo (**Texto**,
+   **Imagen** o **Motion Control**), escribe el prompt y sube las imágenes o el video de
+   muestra. Ajusta modelo, duración, resolución, aspecto y audio; verás el **precio
+   estimado en créditos** antes de generar. Cada imagen genera un video. En **Imagen**
+   puedes añadir una **imagen final** para interpolar entre la primera y la última (según
+   el modelo). Los videos aparecen en la galería con su estado y se pueden reproducir,
    descargar o eliminar.
 
 ## Base de datos y migraciones
@@ -171,7 +175,7 @@ src/
     db.ts               # Cliente de Prisma
     data/               # Acceso a datos
     ai/                 # Resolución de modelos por proveedor
-    video/              # Proveedores de video (Klinggiare) y catálogo
+    video/              # Proveedores de video (Klinggiare y Magnific) y catálogo
   proxy.ts              # Protección de rutas
 prisma/schema.prisma    # Esquema de la base de datos
 prisma/migrations/      # Migraciones

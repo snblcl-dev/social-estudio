@@ -16,6 +16,8 @@ export interface VideoUploadTarget {
   objectKey: string;
   uploadUrl: string;
   contentType: string;
+  /** Cabeceras adicionales que exige la URL firmada del proveedor. */
+  headers?: Record<string, string>;
 }
 
 export interface VideoQuoteInput {
@@ -39,8 +41,8 @@ export interface VideoCreateInput {
 }
 
 export interface VideoProviderJob {
-  id: number;
-  batchId: number | null;
+  id: string;
+  batchId: string | null;
   status: string;
   errorCode: string | null;
   etaMs: number | null;
@@ -59,9 +61,15 @@ export interface VideoProviderJob {
 }
 
 export interface VideoBatchResult {
-  id: number;
+  id: string;
   status: string;
   jobs: VideoProviderJob[];
+  warnings?: string[];
+}
+
+export interface VideoJobContext {
+  model: string;
+  resolution: string;
 }
 
 export interface VideoProviderAdapter {
@@ -77,7 +85,11 @@ export interface VideoProviderAdapter {
   completeUploads(apiKey: string, objectKeys: string[]): Promise<void>;
   quote(apiKey: string, input: VideoQuoteInput): Promise<VideoQuote>;
   createBatch(apiKey: string, input: VideoCreateInput): Promise<VideoBatchResult>;
-  getJob(apiKey: string, jobId: number): Promise<VideoProviderJob>;
-  listJobsByBatch(apiKey: string, batchId: number): Promise<VideoProviderJob[]>;
-  getVideoUrl(apiKey: string, jobId: number): Promise<string>;
+  getJob(
+    apiKey: string,
+    jobId: string,
+    context: VideoJobContext,
+  ): Promise<VideoProviderJob>;
+  listJobsByBatch(apiKey: string, batchId: string): Promise<VideoProviderJob[]>;
+  getVideoUrl(apiKey: string, jobId: string): Promise<string>;
 }

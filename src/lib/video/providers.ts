@@ -2,10 +2,11 @@ import type { VideoProviderOption } from "@/lib/types";
 
 /** Proveedores de video disponibles (client-safe: sin imports de servidor). */
 export const VIDEO_PROVIDERS: VideoProviderOption[] = [
-  { id: "klinggiare", label: "Kling (Klinggiare)" },
+  { id: "klinggiare", label: "Kling (Klinggiare)", wallet: true },
+  { id: "magnific", label: "Magnific", wallet: false },
 ];
 
-export const VIDEO_PROVIDER_IDS = ["klinggiare"] as const;
+export const VIDEO_PROVIDER_IDS = ["klinggiare", "magnific"] as const;
 
 export type VideoProviderId = (typeof VIDEO_PROVIDER_IDS)[number];
 

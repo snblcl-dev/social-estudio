@@ -2,7 +2,12 @@ import { VideoStudio } from "@/components/videos/video-studio";
 import { getVideoApiKey, getVideoKeySummary } from "@/lib/data/video-keys";
 import { listVideoJobs } from "@/lib/data/video-jobs";
 import { getCurrentUser } from "@/lib/session";
-import type { VideoPriceRule, VideoWalletInfo } from "@/lib/types";
+import type {
+  VideoKeySummary,
+  VideoPriceRule,
+  VideoWalletInfo,
+} from "@/lib/types";
+import { VIDEO_PROVIDERS } from "@/lib/video/providers";
 import { getVideoProvider } from "@/lib/video/registry";
 
 export default async function VideosPage() {
@@ -12,51 +17,64 @@ export default async function VideosPage() {
     return null;
   }
 
-  const [jobs, keySummary] = await Promise.all([
+  const [jobs, klingKey, magnificKey] = await Promise.all([
     listVideoJobs(user.id),
     getVideoKeySummary(user.id, "klinggiare"),
+    getVideoKeySummary(user.id, "magnific"),
   ]);
 
-  let rules: VideoPriceRule[] = [];
-  let catalogError: string | null = null;
+  const keySummaries: Record<string, VideoKeySummary | null> = {
+    klinggiare: klingKey,
+    magnific: magnificKey,
+  };
+
+  const rulesByProvider: Record<string, VideoPriceRule[]> = {};
+  const catalogErrors: Record<string, string | null> = {};
+
   let maintenance = false;
   let wallet: VideoWalletInfo | null = null;
   let walletError: string | null = null;
 
-  try {
-    const provider = getVideoProvider("klinggiare");
-    const [prices, status] = await Promise.all([
-      provider.getPrices(),
-      provider.getSystemStatus().catch(() => ({ maintenance: false })),
-    ]);
+  for (const option of VIDEO_PROVIDERS) {
+    try {
+      const provider = getVideoProvider(option.id);
+      rulesByProvider[option.id] = await provider.getPrices();
+      catalogErrors[option.id] = null;
 
-    rules = prices;
-    maintenance = status.maintenance;
+      if (option.wallet) {
+        const status = await provider
+          .getSystemStatus()
+          .catch(() => ({ maintenance: false }));
+        maintenance = status.maintenance;
 
-    const apiKey = await getVideoApiKey(user.id, "klinggiare");
+        const apiKey = await getVideoApiKey(user.id, option.id);
 
-    if (apiKey) {
-      try {
-        wallet = await provider.getWallet(apiKey);
-      } catch (error) {
-        walletError =
-          error instanceof Error ? error.message : "No se pudo consultar el saldo.";
+        if (apiKey) {
+          try {
+            wallet = await provider.getWallet(apiKey);
+          } catch (error) {
+            walletError =
+              error instanceof Error ? error.message : "No se pudo consultar el saldo.";
+          }
+        }
       }
+    } catch (error) {
+      rulesByProvider[option.id] = [];
+      catalogErrors[option.id] =
+        error instanceof Error
+          ? error.message
+          : "No se pudo cargar el catálogo de videos.";
     }
-  } catch (error) {
-    catalogError =
-      error instanceof Error ? error.message : "No se pudo cargar el catálogo de videos.";
   }
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <VideoStudio
         initialJobs={jobs}
-        initialRules={rules}
-        catalogError={catalogError}
+        initialRulesByProvider={rulesByProvider}
+        initialCatalogErrors={catalogErrors}
+        keySummaries={keySummaries}
         maintenance={maintenance}
-        hasKey={Boolean(keySummary)}
-        keySource={keySummary?.source ?? null}
         initialWallet={wallet}
         initialWalletError={walletError}
       />

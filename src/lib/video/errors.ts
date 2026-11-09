@@ -84,6 +84,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   ACCOUNT_CREDIT_EMPTY: "La cuenta de procesamiento no tiene cuota. Reinténtalo.",
   RECOVERY_AMBIGUOUS: "El resultado es incierto. Espera, no vuelvas a crearlo.",
   INTERNAL_ERROR: "Error interno del sistema. Reinténtalo.",
+  FAILED: "La generación falló en el proveedor.",
+  WALLET_UNAVAILABLE: "Este proveedor no expone el saldo por API.",
 };
 
 export function videoErrorMessage(

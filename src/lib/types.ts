@@ -271,8 +271,8 @@ export interface VideoJob {
   id: string;
   user_id: string;
   provider: string;
-  provider_batch_id: number | null;
-  provider_job_id: number | null;
+  provider_batch_id: string | null;
+  provider_job_id: string | null;
   status: string;
   job_type: VideoJobType;
   prompt: string;
@@ -298,6 +298,8 @@ export interface VideoJob {
 export interface VideoProviderOption {
   id: string;
   label: string;
+  /** Si el proveedor expone un endpoint de saldo/wallet. */
+  wallet: boolean;
 }
 
 export interface VideoKeySummary {

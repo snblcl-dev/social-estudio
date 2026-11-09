@@ -45,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatBytes } from "@/lib/attachments";
 import type {
   VideoJob,
+  VideoKeySummary,
   VideoMode,
   VideoPriceRule,
   VideoQuote,
@@ -88,11 +89,10 @@ const EXTENSION_TYPES: Record<string, string> = {
 
 interface VideoStudioProps {
   initialJobs: VideoJob[];
-  initialRules: VideoPriceRule[];
-  catalogError: string | null;
+  initialRulesByProvider: Record<string, VideoPriceRule[]>;
+  initialCatalogErrors: Record<string, string | null>;
+  keySummaries: Record<string, VideoKeySummary | null>;
   maintenance: boolean;
-  hasKey: boolean;
-  keySource: "user" | "env" | null;
   initialWallet: VideoWalletInfo | null;
   initialWalletError: string | null;
 }
@@ -253,11 +253,10 @@ function StepCard({
 
 export function VideoStudio({
   initialJobs,
-  initialRules,
-  catalogError,
+  initialRulesByProvider,
+  initialCatalogErrors,
+  keySummaries,
   maintenance,
-  hasKey,
-  keySource,
   initialWallet,
   initialWalletError,
 }: VideoStudioProps) {
@@ -269,9 +268,10 @@ export function VideoStudio({
   const [motionVideo, setMotionVideo] = useState<File | null>(null);
   const [motionOrientation, setMotionOrientation] = useState<"FULL" | "HALF">("FULL");
   const [keepOriginalSound, setKeepOriginalSound] = useState(true);
-  const [rules, setRules] = useState<VideoPriceRule[]>(initialRules);
+  const [rulesByProvider, setRulesByProvider] = useState(initialRulesByProvider);
+  const [catalogErrors, setCatalogErrors] = useState(initialCatalogErrors);
   const [settings, setSettings] = useState<VideoSettings>(() =>
-    defaultSettings(initialRules),
+    defaultSettings(initialRulesByProvider.klinggiare ?? []),
   );
   const [quote, setQuote] = useState<VideoQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
@@ -293,6 +293,19 @@ export function VideoStudio({
   const urlsRef = useRef<string[]>([]);
 
   const hasEndFrame = mode === "image" && Boolean(endFrame);
+
+  const rules = useMemo(
+    () => rulesByProvider[provider] ?? [],
+    [rulesByProvider, provider],
+  );
+  const catalogError = catalogErrors[provider] ?? null;
+  const keySummary = keySummaries[provider] ?? null;
+  const hasKey = Boolean(keySummary);
+  const keySource = keySummary?.source ?? null;
+  const providerOption = VIDEO_PROVIDERS.find((item) => item.id === provider);
+  const providerWallet = providerOption?.wallet ?? false;
+  const providerLabel = providerOption?.label ?? provider;
+  const envVarName = provider === "magnific" ? "MAGNIFIC_API_KEY" : "KLING_API_KEY";
 
   const filteredRules = useMemo(
     () => rulesForMode(rules, mode, hasEndFrame),
@@ -404,7 +417,7 @@ export function VideoStudio({
   }, []);
 
   const refreshWallet = useCallback(async () => {
-    if (!hasKey) return;
+    if (!providerWallet || !hasKey) return;
     const result = await getVideoWallet(provider);
     if (result.error) {
       setWalletError(result.error);
@@ -412,7 +425,7 @@ export function VideoStudio({
     }
     setWallet(result.wallet ?? null);
     setWalletError(null);
-  }, [hasKey, provider]);
+  }, [providerWallet, hasKey, provider]);
 
   // Sondeo de los videos activos.
   const activeKey = jobs
@@ -459,6 +472,19 @@ export function VideoStudio({
     setPendingPrice(null);
   }
 
+  function changeProvider(next: VideoProviderId) {
+    if (next === provider) return;
+    setProvider(next);
+    setPendingPrice(null);
+
+    if (next === "magnific" && mode !== "image") {
+      if (endFrame) URL.revokeObjectURL(endFrame.url);
+      setEndFrame(null);
+      setMotionVideo(null);
+      setMode("image");
+    }
+  }
+
   function changeMode(next: VideoMode) {
     setMode(next);
     setPendingPrice(null);
@@ -483,8 +509,9 @@ export function VideoStudio({
       toast.error("Formato de imagen no admitido.");
       return;
     }
-    if (images.length + incoming.length > 100) {
-      toast.error("Puedes subir hasta 100 imágenes.");
+    const maxImages = provider === "magnific" ? 14 : 100;
+    if (images.length + incoming.length > maxImages) {
+      toast.error(`Puedes subir hasta ${maxImages} imágenes.`);
       return;
     }
 
@@ -538,7 +565,7 @@ export function VideoStudio({
   }
 
   function validateInputs(): string | null {
-    if (!hasKey) return "Configura tu clave de Klinggiare en Ajustes.";
+    if (!hasKey) return `Configura tu clave de ${providerLabel} en Ajustes.`;
     if (maintenance) return "Klinggiare está en mantenimiento.";
     if (!prompt.trim()) return "Escribe un prompt.";
     if (filteredRules.length === 0) return "No hay una combinación de precio válida.";
@@ -549,6 +576,13 @@ export function VideoStudio({
     }
     if (mode === "motion" && !motionVideo) {
       return "Sube un video de muestra para Motion Control.";
+    }
+    if (
+      provider === "magnific" &&
+      mode === "image" &&
+      images.length + (endFrame ? 1 : 0) > 14
+    ) {
+      return "Magnific permite hasta 14 archivos por envío.";
     }
     return null;
   }
@@ -595,7 +629,10 @@ export function VideoStudio({
         try {
           const response = await fetch(target.uploadUrl, {
             method: "PUT",
-            headers: { "Content-Type": target.contentType },
+            headers: {
+              "Content-Type": target.contentType,
+              ...(target.headers ?? {}),
+            },
             body: files[index],
           });
           return response.ok;
@@ -667,6 +704,10 @@ export function VideoStudio({
       setJobs((current) => mergeJobs(current, result.jobs ?? []));
     }
 
+    if (result.warning) {
+      toast.warning(result.warning);
+    }
+
     setPendingPrice(null);
     clearInputs();
     setRightTab("history");
@@ -727,7 +768,10 @@ export function VideoStudio({
       toast.error(result.error);
       return;
     }
-    if (result.rules) setRules(result.rules);
+    if (result.rules) {
+      setRulesByProvider((current) => ({ ...current, [provider]: result.rules ?? [] }));
+      setCatalogErrors((current) => ({ ...current, [provider]: null }));
+    }
   }
 
   function handleDelete() {
@@ -788,28 +832,35 @@ export function VideoStudio({
       {/* Riel de controles */}
       <aside className="flex max-h-[78dvh] min-h-0 flex-col border-b border-white/10 bg-[#0a0a0b] lg:max-h-none lg:border-r lg:border-b-0">
         <nav className="flex shrink-0 items-center gap-5 overflow-x-auto border-b border-white/10 px-5">
-          {MODE_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => changeMode(tab.id)}
-              className={cn(
-                "relative shrink-0 pt-4 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
-                mode === tab.id ? "text-white" : "text-white/40 hover:text-white/75",
-              )}
-            >
-              {tab.label}
-              {mode === tab.id ? (
-                <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
-              ) : null}
-            </button>
-          ))}
+          {MODE_TABS.map((tab) => {
+            const supported =
+              rulesForMode(rulesByProvider[provider] ?? [], tab.id, false).length > 0;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                disabled={!supported}
+                onClick={() => changeMode(tab.id)}
+                className={cn(
+                  "relative shrink-0 pt-4 pb-3 text-sm font-medium whitespace-nowrap transition-colors",
+                  mode === tab.id ? "text-white" : "text-white/40 hover:text-white/75",
+                  !supported && "cursor-not-allowed opacity-30 hover:text-white/40",
+                )}
+              >
+                {tab.label}
+                {mode === tab.id ? (
+                  <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary" />
+                ) : null}
+              </button>
+            );
+          })}
         </nav>
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
           {!hasKey ? (
             <p className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
-              Configura tu clave de Klinggiare en{" "}
+              Configura tu clave de {providerLabel} en{" "}
               <Link href="/ajustes" className="underline underline-offset-4">
                 Ajustes
               </Link>{" "}
@@ -1026,7 +1077,9 @@ export function VideoStudio({
             <FieldSelect
               label="Proveedor"
               value={provider}
-              onChange={(event) => setProvider(event.target.value as VideoProviderId)}
+              onChange={(event) =>
+                changeProvider(event.target.value as VideoProviderId)
+              }
             >
               {VIDEO_PROVIDERS.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -1137,7 +1190,7 @@ export function VideoStudio({
 
             {keySource === "env" ? (
               <p className="text-[11px] text-white/30">
-                Clave tomada de la variable de entorno KLING_API_KEY.
+                Clave tomada de la variable de entorno {envVarName}.
               </p>
             ) : null}
           </div>
@@ -1216,15 +1269,19 @@ export function VideoStudio({
 
           <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/50">
             <WalletIcon className="size-3.5" />
-            {!hasKey
-              ? "Sin clave"
-              : wallet
-                ? `Saldo ${formatCredits(wallet.balance)} créditos${
-                    wallet.heldReserve > 0
-                      ? ` · retenido ${formatCredits(wallet.heldReserve)} créditos`
-                      : ""
-                  }`
-                : (walletError ?? "Saldo no disponible")}
+            {!providerWallet ? (
+              "Saldo no disponible en este proveedor"
+            ) : !hasKey ? (
+              "Sin clave"
+            ) : wallet ? (
+              `Saldo ${formatCredits(wallet.balance)} créditos${
+                wallet.heldReserve > 0
+                  ? ` · retenido ${formatCredits(wallet.heldReserve)} créditos`
+                  : ""
+              }`
+            ) : (
+              (walletError ?? "Saldo no disponible")
+            )}
           </div>
         </header>
 

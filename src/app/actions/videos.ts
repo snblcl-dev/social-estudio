@@ -70,6 +70,7 @@ export interface VideoWalletActionResult extends VideoActionResult {
 
 export interface VideoJobsActionResult extends VideoActionResult {
   jobs?: VideoJob[];
+  warning?: string;
 }
 
 export interface VideoCatalogActionResult extends VideoActionResult {
@@ -77,7 +78,12 @@ export interface VideoCatalogActionResult extends VideoActionResult {
 }
 
 export interface VideoUploadInitResult extends VideoActionResult {
-  items?: { objectKey: string; uploadUrl: string; contentType: string }[];
+  items?: {
+    objectKey: string;
+    uploadUrl: string;
+    contentType: string;
+    headers?: Record<string, string>;
+  }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +394,7 @@ export async function createVideoBatch(
         id: randomUUID(),
         userId: user.id,
         provider: data.provider,
-        providerBatchId: job.batchId ?? batch.id,
+        providerBatchId: job.batchId ?? (batch.id ? batch.id : null),
         providerJobId: job.id,
         status: job.status,
         jobType,
@@ -413,7 +419,13 @@ export async function createVideoBatch(
     );
 
     revalidatePath("/videos");
-    return { ok: true, jobs: rows };
+    return {
+      ok: true,
+      jobs: rows,
+      ...(batch.warnings && batch.warnings.length > 0
+        ? { warning: batch.warnings.join(" ") }
+        : {}),
+    };
   } catch (error) {
     if (error instanceof VideoApiError) {
       if (error.code === "PRICE_CHANGED" && error.quote) {
@@ -522,7 +534,7 @@ export async function refreshVideoJobs(ids: string[]): Promise<VideoJobsActionRe
     if (!apiKey || first.provider_batch_id === null) continue;
     const adapter = adapterFor(first.provider);
 
-    let snapshots: Map<number, VideoProviderJob>;
+    let snapshots: Map<string, VideoProviderJob>;
     try {
       const list = await adapter.listJobsByBatch(apiKey, first.provider_batch_id);
       snapshots = new Map(list.map((snapshot) => [snapshot.id, snapshot]));
@@ -547,7 +559,10 @@ export async function refreshVideoJobs(ids: string[]): Promise<VideoJobsActionRe
     const adapter = adapterFor(job.provider);
 
     try {
-      const snapshot = await adapter.getJob(apiKey, job.provider_job_id);
+      const snapshot = await adapter.getJob(apiKey, job.provider_job_id, {
+        model: job.model,
+        resolution: job.resolution,
+      });
       const row = await applySnapshot(user.id, job, snapshot, apiKey, adapter);
       if (row) updated.set(job.id, row);
     } catch {
@@ -565,7 +580,7 @@ async function applySnapshot(
   userId: string,
   job: VideoJob,
   snapshot: {
-    id: number;
+    id: string;
     status: string;
     errorCode: string | null;
     etaMs: number | null;

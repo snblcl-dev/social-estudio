@@ -243,8 +243,8 @@ function mapQuote(raw: RawQuote): VideoQuote {
 
 function mapJob(raw: RawJob): VideoProviderJob {
   return {
-    id: raw.id ?? 0,
-    batchId: raw.batchId ?? null,
+    id: raw.id !== undefined && raw.id !== null ? String(raw.id) : "",
+    batchId: raw.batchId !== undefined && raw.batchId !== null ? String(raw.batchId) : null,
     status: raw.status ?? "queued",
     errorCode: raw.errorCode ?? null,
     etaMs: raw.etaMs ?? null,
@@ -390,7 +390,7 @@ async function createBatch(
     });
 
     return {
-      id: data.id ?? 0,
+      id: data.id !== undefined && data.id !== null ? String(data.id) : "",
       status: data.status ?? "queued",
       jobs: (data.jobs ?? []).map(mapJob),
     };
@@ -403,28 +403,31 @@ async function createBatch(
   }
 }
 
-async function getJob(apiKey: string, jobId: number): Promise<VideoProviderJob> {
-  const data = await request<RawJob>(`/api/v1/ext/jobs/${jobId}`, { apiKey });
+async function getJob(apiKey: string, jobId: string): Promise<VideoProviderJob> {
+  const data = await request<RawJob>(
+    `/v1/ai/ext/jobs/${encodeURIComponent(jobId)}`,
+    { apiKey },
+  );
   return mapJob(data);
 }
 
 async function listJobsByBatch(
   apiKey: string,
-  batchId: number,
+  batchId: string,
 ): Promise<VideoProviderJob[]> {
   const data = await request<{ items?: RawJob[] }>(
-    `/api/v1/ext/jobs?batchId=${batchId}&pageSize=100`,
+    `/v1/ai/ext/jobs?batchId=${encodeURIComponent(batchId)}&pageSize=100`,
     { apiKey },
   );
 
   return (data.items ?? []).map(mapJob);
 }
 
-async function getVideoUrl(apiKey: string, jobId: number): Promise<string> {
-  const data = await request<{ url?: string }>(`/api/v1/ext/jobs/${jobId}/video-url`, {
-    apiKey,
-    attempts: 2,
-  });
+async function getVideoUrl(apiKey: string, jobId: string): Promise<string> {
+  const data = await request<{ url?: string }>(
+    `/v1/ai/ext/jobs/${encodeURIComponent(jobId)}/video-url`,
+    { apiKey, attempts: 2 },
+  );
 
   if (!data.url) {
     throw new VideoApiError({

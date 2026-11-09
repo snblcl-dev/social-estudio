@@ -8,6 +8,9 @@ function envKeyFor(provider: string): string | null {
   if (provider === "klinggiare") {
     return process.env.KLING_API_KEY?.trim() || null;
   }
+  if (provider === "magnific") {
+    return process.env.MAGNIFIC_API_KEY?.trim() || null;
+  }
   return null;
 }
 
