@@ -56,10 +56,7 @@ export function aspectOptions(rules: VideoPriceRule[]): string[] {
   return values.filter((value) => value && value !== "*");
 }
 
-export function formatVnd(amount: number): string {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
+/** Formatea un importe como créditos (1 unidad de precio = 1 crédito). */
+export function formatCredits(amount: number): string {
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(amount);
 }

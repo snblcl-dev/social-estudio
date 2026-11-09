@@ -55,7 +55,7 @@ import { cn } from "@/lib/utils";
 import {
   COMMON_ASPECT_RATIOS,
   aspectOptions,
-  formatVnd,
+  formatCredits,
   rulesForMode,
   uniqueAudioOptions,
   uniqueDurations,
@@ -184,7 +184,7 @@ function mergeJobs(current: VideoJob[], incoming: VideoJob[]): VideoJob[] {
 function discountLabel(discount: NonNullable<VideoQuote["discount"]>): string {
   return discount.kind === "percent"
     ? `${(discount.value / 100).toLocaleString("es-ES")}% de descuento`
-    : `${formatVnd(discount.value)} de descuento`;
+    : `${formatCredits(discount.value)} créditos de descuento`;
 }
 
 function FieldSelect({
@@ -780,7 +780,7 @@ export function VideoStudio({
   const generateLabel = isCreating
     ? "Generando…"
     : quote
-      ? `Generar · ${formatVnd(quote.totalAmount)}`
+      ? `Generar · ${formatCredits(quote.totalAmount)} créditos`
       : "Generar video";
 
   return (
@@ -840,7 +840,8 @@ export function VideoStudio({
           {pendingPrice ? (
             <div className="flex flex-col gap-2 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
               <span>
-                El precio cambió a {formatVnd(pendingPrice.quote.totalAmount)} para{" "}
+                El precio cambió a {formatCredits(pendingPrice.quote.totalAmount)}{" "}
+                créditos para{" "}
                 {pendingPrice.quote.imageCount} video(s).
               </span>
               <Button
@@ -1151,14 +1152,14 @@ export function VideoStudio({
                 <Loader2Icon className="size-4 animate-spin text-white/50" />
               ) : priceVisible && quote ? (
                 <span className="text-sm font-semibold text-white">
-                  {formatVnd(quote.totalAmount)}
+                  {formatCredits(quote.totalAmount)} créditos
                 </span>
               ) : (
                 <span className="text-white/30">—</span>
               )}
               {priceVisible && quote ? (
                 <span className="text-[11px] text-white/35">
-                  {quote.imageCount} video(s) · {formatVnd(quote.perVideoAmount)} c/u
+                  {quote.imageCount} video(s) · {formatCredits(quote.perVideoAmount)} c/u
                 </span>
               ) : null}
             </div>
@@ -1218,9 +1219,9 @@ export function VideoStudio({
             {!hasKey
               ? "Sin clave"
               : wallet
-                ? `Saldo ${formatVnd(wallet.balance)}${
+                ? `Saldo ${formatCredits(wallet.balance)} créditos${
                     wallet.heldReserve > 0
-                      ? ` · retenido ${formatVnd(wallet.heldReserve)}`
+                      ? ` · retenido ${formatCredits(wallet.heldReserve)} créditos`
                       : ""
                   }`
                 : (walletError ?? "Saldo no disponible")}

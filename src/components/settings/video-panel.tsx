@@ -22,7 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { VideoKeySummary } from "@/lib/types";
-import { formatVnd } from "@/lib/video/catalog";
+import { formatCredits } from "@/lib/video/catalog";
 
 const PROVIDER = "klinggiare";
 
@@ -67,9 +67,9 @@ export function VideoPanel({ summary }: VideoPanelProps) {
 
       toast.success(
         result.wallet
-          ? `Saldo en Klinggiare: ${formatVnd(result.wallet.balance)}${
+          ? `Saldo en Klinggiare: ${formatCredits(result.wallet.balance)} créditos${
               result.wallet.heldReserve > 0
-                ? ` · retenido ${formatVnd(result.wallet.heldReserve)}`
+                ? ` · retenido ${formatCredits(result.wallet.heldReserve)} créditos`
                 : ""
             }`
           : "Clave válida.",

@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { VideoJob } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatVnd } from "@/lib/video/catalog";
+import { formatCredits } from "@/lib/video/catalog";
 import { videoProviderLabel } from "@/lib/video/providers";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -96,7 +96,9 @@ export function VideoJobCard({
           {job.duration_seconds > 0 ? <Chip>{job.duration_seconds}s</Chip> : null}
           {job.has_end_frame ? <Chip>Imagen final</Chip> : null}
           {job.job_type === "motion_control" ? <Chip>Motion Control</Chip> : null}
-          {job.price_amount !== null ? <Chip>{formatVnd(job.price_amount)}</Chip> : null}
+          {job.price_amount !== null ? (
+            <Chip>{formatCredits(job.price_amount)} créditos</Chip>
+          ) : null}
         </div>
 
         {isProcessing ? (

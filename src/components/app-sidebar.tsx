@@ -172,6 +172,78 @@ export function AppSidebar({
   // entrar al proyecto. Solo se listan las que no tienen proyecto.
   const ungrouped = conversations.filter((conversation) => !conversation.project_id);
 
+  // En la sección de videos del sitio se contrae a un riel de iconos para no
+  // duplicar la barra lateral con el riel de controles de esa sección.
+  if (pathname === "/videos") {
+    const railLinks = [
+      { href: "/", label: "Chat", icon: SparklesIcon },
+      { href: "/videos", label: "Videos", icon: FilmIcon },
+      { href: "/guiones", label: "Guiones", icon: FileTextIcon },
+      { href: "/ajustes", label: "Ajustes", icon: SettingsIcon },
+    ];
+
+    return (
+      <aside className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border/60 bg-sidebar/60 py-3 backdrop-blur-xl">
+        {railLinks.map((link) => {
+          const Icon = link.icon;
+          const isActive = link.href !== "/" && pathname.startsWith(link.href);
+
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              title={link.label}
+              aria-label={link.label}
+              className={cn(
+                "flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                isActive && "bg-primary/10 text-primary",
+              )}
+            >
+              <Icon className="size-4" />
+            </Link>
+          );
+        })}
+
+        <div className="mt-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Opciones"
+              title="Opciones"
+            >
+              <MenuIcon className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="right" align="end" className="w-56">
+              {OPTIONS_LINKS.map((link) => {
+                const Icon = link.icon;
+
+                return (
+                  <DropdownMenuItem
+                    key={link.href}
+                    onClick={() => router.push(link.href)}
+                  >
+                    <Icon />
+                    {link.label}
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => {
+                  void signOut();
+                }}
+              >
+                <LogOutIcon />
+                Salir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </aside>
+    );
+  }
+
   function handleDelete(id: string) {
     setPendingId(id);
     startTransition(async () => {
