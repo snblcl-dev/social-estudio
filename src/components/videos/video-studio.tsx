@@ -610,57 +610,90 @@ export function VideoStudio({
       return { uploaded: { images: [], endFrame: null, motion: null } };
     }
 
-    const prepared = await prepareVideoUploads({
-      provider,
-      files: files.map((file) => ({
-        filename: file.name,
-        contentType: contentTypeOf(file),
-        sizeBytes: file.size,
-      })),
-    });
+    let objectKeys: string[];
 
-    if (prepared.error || !prepared.items) {
-      return { error: prepared.error ?? "No se pudieron preparar los archivos." };
-    }
+    if (provider === "magnific") {
+      // El almacenamiento de Magnific no permite el PUT directo desde el navegador
+      // (CORS), así que la subida se hace desde nuestro servidor.
+      const form = new FormData();
+      form.append("provider", provider);
+      files.forEach((file) => form.append("files", file, file.name));
 
-    const targets = prepared.items;
-    const uploadedOk = await Promise.all(
-      targets.map(async (target, index) => {
-        try {
-          const response = await fetch(target.uploadUrl, {
-            method: "PUT",
-            headers: {
-              "Content-Type": target.contentType,
-              ...(target.headers ?? {}),
-            },
-            body: files[index],
-          });
-          return response.ok;
-        } catch {
-          return false;
-        }
-      }),
-    );
+      let response: Response;
+      try {
+        response = await fetch("/api/videos/uploads", {
+          method: "POST",
+          body: form,
+        });
+      } catch {
+        return { error: "No se pudieron subir los archivos al servidor." };
+      }
 
-    if (uploadedOk.some((ok) => !ok)) {
-      return { error: "No se pudieron subir los archivos al proveedor." };
-    }
+      const data = (await response.json().catch(() => null)) as {
+        items?: { objectKey: string; contentType: string }[];
+        error?: string;
+      } | null;
 
-    const completed = await completeVideoUploads({
-      provider,
-      objectKeys: targets.map((target) => target.objectKey),
-    });
+      if (!response.ok || !data?.items) {
+        return { error: data?.error ?? "No se pudieron subir los archivos." };
+      }
 
-    if (completed.error) {
-      return { error: completed.error };
+      objectKeys = data.items.map((item) => item.objectKey);
+    } else {
+      const prepared = await prepareVideoUploads({
+        provider,
+        files: files.map((file) => ({
+          filename: file.name,
+          contentType: contentTypeOf(file),
+          sizeBytes: file.size,
+        })),
+      });
+
+      if (prepared.error || !prepared.items) {
+        return { error: prepared.error ?? "No se pudieron preparar los archivos." };
+      }
+
+      const targets = prepared.items;
+      const uploadedOk = await Promise.all(
+        targets.map(async (target, index) => {
+          try {
+            const response = await fetch(target.uploadUrl, {
+              method: "PUT",
+              headers: {
+                "Content-Type": target.contentType,
+                ...(target.headers ?? {}),
+              },
+              body: files[index],
+            });
+            return response.ok;
+          } catch {
+            return false;
+          }
+        }),
+      );
+
+      if (uploadedOk.some((ok) => !ok)) {
+        return { error: "No se pudieron subir los archivos al proveedor." };
+      }
+
+      const completed = await completeVideoUploads({
+        provider,
+        objectKeys: targets.map((target) => target.objectKey),
+      });
+
+      if (completed.error) {
+        return { error: completed.error };
+      }
+
+      objectKeys = targets.map((target) => target.objectKey);
     }
 
     const uploaded: UploadedKeys = { images: [], endFrame: null, motion: null };
-    targets.forEach((target, index) => {
+    objectKeys.forEach((objectKey, index) => {
       const role = roles[index];
-      if (role === "image") uploaded.images.push(target.objectKey);
-      else if (role === "end") uploaded.endFrame = target.objectKey;
-      else uploaded.motion = target.objectKey;
+      if (role === "image") uploaded.images.push(objectKey);
+      else if (role === "end") uploaded.endFrame = objectKey;
+      else uploaded.motion = objectKey;
     });
 
     return { uploaded };
