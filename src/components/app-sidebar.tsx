@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import {
   ChevronsUpDownIcon,
   FileTextIcon,
+  FilmIcon,
   FolderIcon,
   FolderPlusIcon,
   Loader2Icon,
@@ -275,6 +276,19 @@ export function AppSidebar({
           Social Estudio
         </span>
       </Link>
+
+      <div className="px-3 pb-2">
+        <Link
+          href="/videos"
+          className={cn(
+            "flex items-center gap-2 rounded-lg border-l-2 border-transparent px-2.5 py-2 text-sm transition-colors hover:bg-muted",
+            pathname === "/videos" && "border-primary bg-primary/10 text-primary",
+          )}
+        >
+          <FilmIcon className="size-4" />
+          Videos
+        </Link>
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-1 px-3">
         {showConversations ? (

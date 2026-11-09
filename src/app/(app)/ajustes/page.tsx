@@ -4,10 +4,12 @@ import { FishPanel } from "@/components/settings/fish-panel";
 import { ManualModelsPanel } from "@/components/settings/manual-models-panel";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { VibiPanel } from "@/components/settings/vibi-panel";
+import { VideoPanel } from "@/components/settings/video-panel";
 import { PageHeader } from "@/components/page-header";
 import { listCustomModels, listCustomProviders } from "@/lib/data/custom-providers";
 import { getFishKeySummary } from "@/lib/data/fish";
 import { getSettings, listApiKeySummaries } from "@/lib/data/settings";
+import { getVideoKeySummary } from "@/lib/data/video-keys";
 import { getVibiKeySummary } from "@/lib/data/vibi";
 import { listProviderOptions } from "@/lib/providers-server";
 import { getCurrentUser } from "@/lib/session";
@@ -20,16 +22,25 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [settings, keys, providerOptions, customProviders, customModels, vibiKey, fishKey] =
-    await Promise.all([
-      getSettings(user.id),
-      listApiKeySummaries(user.id),
-      listProviderOptions(user.id),
-      listCustomProviders(user.id),
-      listCustomModels(user.id),
-      getVibiKeySummary(user.id),
-      getFishKeySummary(user.id),
-    ]);
+  const [
+    settings,
+    keys,
+    providerOptions,
+    customProviders,
+    customModels,
+    vibiKey,
+    fishKey,
+    videoKey,
+  ] = await Promise.all([
+    getSettings(user.id),
+    listApiKeySummaries(user.id),
+    listProviderOptions(user.id),
+    listCustomProviders(user.id),
+    listCustomModels(user.id),
+    getVibiKeySummary(user.id),
+    getFishKeySummary(user.id),
+    getVideoKeySummary(user.id, "klinggiare"),
+  ]);
 
   const defaultProvider: ProviderKey = providerOptions.some(
     (option) => option.key === settings.default_provider,
@@ -54,6 +65,8 @@ export default async function SettingsPage() {
         <VibiPanel summary={vibiKey} />
 
         <FishPanel summary={fishKey} />
+
+        <VideoPanel summary={videoKey} />
 
         <SettingsForm
           initial={{

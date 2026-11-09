@@ -209,3 +209,104 @@ export interface Voiceover {
   created_at: string;
   updated_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Videos generados con proveedores externos (Klinggiare, ...)
+// ---------------------------------------------------------------------------
+
+export type VideoMode = "text" | "image" | "motion";
+
+export type VideoJobType = "text_to_video" | "image_to_video" | "motion_control";
+
+/** Regla de precio de un proveedor de video. */
+export interface VideoPriceRule {
+  provider: string;
+  operation: string;
+  model: string;
+  durationSeconds: number;
+  aspectRatio: string;
+  resolution: string;
+  audio: boolean;
+  freeAudio: boolean;
+  currency: string;
+  amount: number;
+  textToVideo: boolean;
+  motionControl: boolean;
+  tailImage: boolean;
+  description: string;
+  enabled: boolean;
+  discountBadge?: { label: string; endsAt: string };
+}
+
+export interface VideoSettings {
+  model: string;
+  durationSeconds: number;
+  aspectRatio: string;
+  resolution: "480p" | "720p" | "1080p" | "4k";
+  audio: boolean;
+}
+
+export interface VideoDiscount {
+  programName: string;
+  kind: "percent" | "fixed";
+  /** Porcentaje en basis points cuando kind = "percent"; VND cuando kind = "fixed". */
+  value: number;
+  originalTotal: number;
+  discountTotal: number;
+  finalTotal: number;
+  endsAt: string;
+}
+
+export interface VideoQuote {
+  perVideoAmount: number;
+  originalPerVideoAmount: number;
+  totalAmount: number;
+  originalTotal: number;
+  currency: string;
+  imageCount: number;
+  discount: VideoDiscount | null;
+}
+
+export interface VideoJob {
+  id: string;
+  user_id: string;
+  provider: string;
+  provider_batch_id: number | null;
+  provider_job_id: number | null;
+  status: string;
+  job_type: VideoJobType;
+  prompt: string;
+  model: string;
+  duration_seconds: number;
+  aspect_ratio: string;
+  resolution: string;
+  audio: boolean;
+  has_end_frame: boolean;
+  thumbnail_url: string | null;
+  provider_video_url: string | null;
+  has_video: boolean;
+  price_amount: number | null;
+  price_currency: string;
+  error_code: string | null;
+  error_message: string | null;
+  eta_ms: number | null;
+  created_at: string;
+  updated_at: string;
+  finished_at: string | null;
+}
+
+export interface VideoProviderOption {
+  id: string;
+  label: string;
+}
+
+export interface VideoKeySummary {
+  masked: string;
+  source: "user" | "env";
+}
+
+export interface VideoWalletInfo {
+  balance: number;
+  heldReserve: number;
+  currency: string;
+}

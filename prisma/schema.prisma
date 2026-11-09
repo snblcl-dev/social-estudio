@@ -37,6 +37,8 @@ model User {
   customModels    CustomModel[]
   voiceovers      Voiceover[]
   projects        Project[]
+  videoProviderKeys VideoProviderKey[]
+  videoJobs         VideoJob[]
 }
 
 model Session {
@@ -298,4 +300,65 @@ model Voiceover {
 
   @@index([user_id, created_at])
   @@index([script_id, created_at])
+}
+
+// ---------------------------------------------------------------------------
+// VIDEO_PROVIDER_KEYS: claves de proveedores de video cifradas (AES-256-GCM).
+// Se referencian por `provider` ("klinggiare", ...).
+// ---------------------------------------------------------------------------
+
+model VideoProviderKey {
+  id            String   @id @default(uuid())
+  user_id       String
+  provider      String
+  encrypted_key String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, provider])
+  @@index([user_id])
+}
+
+// ---------------------------------------------------------------------------
+// VIDEO_JOBS: videos generados con proveedores externos (Klinggiare, ...).
+// Cada fila representa un video/job del proveedor.
+// ---------------------------------------------------------------------------
+
+model VideoJob {
+  id                 String    @id @default(uuid())
+  user_id            String
+  provider           String    @default("klinggiare")
+  provider_batch_id  Int?
+  provider_job_id    Int?
+  status             String    @default("queued")
+  job_type           String    @default("image_to_video")
+  prompt             String
+  model              String
+  duration_seconds   Int
+  aspect_ratio       String
+  resolution         String
+  audio              Boolean   @default(false)
+  has_end_frame      Boolean   @default(false)
+  input_object_key   String?
+  tail_object_key    String?
+  motion_video_key   String?
+  thumbnail_url      String?
+  video_path         String?
+  provider_video_url String?
+  price_amount       Int?
+  price_currency     String    @default("VND")
+  price_snapshot     String    @default("{}")
+  error_code         String?
+  error_message      String?
+  eta_ms             Int?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  finished_at        DateTime?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@index([user_id, status])
 }

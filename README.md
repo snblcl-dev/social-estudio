@@ -10,6 +10,8 @@ Generador de guiones y prompts de imagen para redes sociales con IA.
 - **Guiones**: crea guiones **a mano** o guárdalos desde el chat; ver, **editar**, copiar/descargar y generar voz.
 - **Voz de los guiones** con [Vibi](https://vibi.pro) (ElevenLabs, MiniMax y CapCut) y
   [Fish Audio](https://fish.audio): genera, reproduce y descarga la locución de cada guion.
+- **Videos** con Kling (Klinggiare): genera desde texto, una o varias imágenes, imagen
+  final o Motion Control, con cotización previa, galería y descarga local de los MP4.
 - **API keys** guardadas cifradas (AES-256-GCM) en la base de datos.
 - Login de usuario único o de pocos usuarios (Better Auth, email + contraseña).
 
@@ -57,6 +59,11 @@ API_KEY_ENCRYPTION_SECRET=otro-secreto-que-generaste
   cambias, las claves guardadas dejarán de poder descifrarse.
 - `DATABASE_URL` apunta al archivo SQLite. La ruta es relativa a `prisma/`.
 
+Opcional: `KLING_API_KEY` (clave `kling_sk_...` de
+[Klinggiare](https://klinggiare.com)) para generar videos sin guardarla en Ajustes.
+`FISH_API_BASE_URL` y `KLING_API_BASE_URL` permiten cambiar las URLs base de esos
+proveedores.
+
 ### 2. Base de datos y usuario
 
 ```bash
@@ -95,8 +102,15 @@ primera API key.
    video con las instrucciones del perfil de video. Puedes copiarlos desde el propio mensaje.
 5. **Guardar en Guiones** guarda el último mensaje del asistente en **Guiones**, donde puedes
    verlo, **editarlo** (título y contenido), copiarlo o eliminarlo.
-6. **Guiones → Generar voz** convierte un guion guardado en audio con Vibi (elige proveedor,
-   voz, idioma y modelo). El audio se reproduce y se puede descargar desde la misma tarjeta.
+6. **Guiones → Generar voz** convierte un guion guardado en audio con Vibi o Fish Audio
+   (elige proveedor, voz, idioma y modelo). El audio se reproduce y se puede descargar
+   desde la misma tarjeta.
+7. **Videos** → elige el modo (**Texto**, **Imagen** o **Motion Control**), escribe el prompt
+   y sube las imágenes o el video de muestra. Ajusta modelo, duración, resolución, aspecto
+   y audio; verás el **precio estimado** antes de generar. Cada imagen genera un video.
+   En **Imagen** puedes añadir una **imagen final** para interpolar entre la primera y la
+   última. Los videos aparecen en la galería con su estado y se pueden reproducir,
+   descargar o eliminar.
 
 ## Base de datos y migraciones
 
@@ -135,8 +149,9 @@ npm run create-user      # crea una cuenta de usuario
    apunte a `http://127.0.0.1:3000`.
 
 El archivo SQLite se guarda en `data/`. Los audios generados con Fish Audio se guardan en
-`data/audio/`. **Haz copias de seguridad de `data/app.db` y de `data/audio/`**
-(con la app parada o mediante `sqlite3 data/app.db ".backup backup.db"`).
+`data/audio/` y los videos en `data/videos/`. **Haz copias de seguridad de `data/app.db`,
+`data/audio/` y `data/videos/`** (con la app parada o mediante
+`sqlite3 data/app.db ".backup backup.db"`).
 
 ## Estructura relevante
 
@@ -147,13 +162,16 @@ src/
     api/chat/           # Streaming de chat y prompts de imagen (AI SDK)
     api/auth/           # Handler de Better Auth
     api/models/         # Listado de modelos por proveedor
+    api/videos/         # Servido de los MP4 generados (con Range)
     actions/            # Server Actions (CRUD y auth)
+  components/           # UI por dominio (chat, guiones, videos, ajustes…)
   lib/
     auth.ts             # Instancia de Better Auth
     session.ts          # getCurrentUser (sesión en el servidor)
     db.ts               # Cliente de Prisma
     data/               # Acceso a datos
     ai/                 # Resolución de modelos por proveedor
+    video/              # Proveedores de video (Klinggiare) y catálogo
   proxy.ts              # Protección de rutas
 prisma/schema.prisma    # Esquema de la base de datos
 prisma/migrations/      # Migraciones
