@@ -504,9 +504,17 @@ export function VideoStudio({
   function handleImages(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
     const incoming = Array.from(fileList);
-    const invalid = incoming.find((file) => !IMAGE_TYPES.includes(contentTypeOf(file)));
+    const allowedTypes =
+      provider === "magnific" ? ["image/jpeg", "image/png"] : IMAGE_TYPES;
+    const invalid = incoming.find(
+      (file) => !allowedTypes.includes(contentTypeOf(file)),
+    );
     if (invalid) {
-      toast.error("Formato de imagen no admitido.");
+      toast.error(
+        provider === "magnific"
+          ? "Los modelos de Magnific aceptan imágenes JPG o PNG."
+          : "Formato de imagen no admitido.",
+      );
       return;
     }
     const maxImages = provider === "magnific" ? 14 : 100;
@@ -534,8 +542,14 @@ export function VideoStudio({
   function handleEndFrame(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
     const file = fileList[0];
-    if (!IMAGE_TYPES.includes(contentTypeOf(file))) {
-      toast.error("Formato de imagen no admitido.");
+    const allowedTypes =
+      provider === "magnific" ? ["image/jpeg", "image/png"] : IMAGE_TYPES;
+    if (!allowedTypes.includes(contentTypeOf(file))) {
+      toast.error(
+        provider === "magnific"
+          ? "Los modelos de Magnific aceptan imágenes JPG o PNG."
+          : "Formato de imagen no admitido.",
+      );
       return;
     }
     if (endFrame) URL.revokeObjectURL(endFrame.url);
@@ -979,7 +993,11 @@ export function VideoStudio({
                   <input
                     type="file"
                     multiple
-                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    accept={
+                      provider === "magnific"
+                        ? "image/jpeg,image/png"
+                        : "image/jpeg,image/png,image/webp,image/gif"
+                    }
                     className="hidden"
                     onChange={(event) => {
                       handleImages(event.target.files);
@@ -1034,7 +1052,11 @@ export function VideoStudio({
                           Subir
                           <input
                             type="file"
-                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            accept={
+                      provider === "magnific"
+                        ? "image/jpeg,image/png"
+                        : "image/jpeg,image/png,image/webp,image/gif"
+                    }
                             className="hidden"
                             onChange={(event) => {
                               handleEndFrame(event.target.files);

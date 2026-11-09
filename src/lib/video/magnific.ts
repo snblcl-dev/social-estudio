@@ -367,9 +367,20 @@ async function magnificFetch<T>(
       if (!response.ok) {
         const record = (json ?? {}) as {
           message?: string;
-          problem?: { message?: string };
+          problem?: {
+            message?: string;
+            invalid_params?: { name?: string; field?: string; reason?: string }[];
+          };
         };
-        const rawMessage = record.message ?? record.problem?.message ?? "";
+        const details = (record.problem?.invalid_params ?? [])
+          .map(
+            (param) =>
+              `${param.field ?? param.name ?? "campo"}: ${param.reason ?? "inválido"}`,
+          )
+          .join("; ");
+        const rawMessage = [record.message ?? record.problem?.message, details]
+          .filter(Boolean)
+          .join(" — ");
         const retryAfter = Number(response.headers.get("Retry-After") ?? 0);
         const error = new VideoApiError({
           message: friendlyMessage(response.status, rawMessage),
@@ -618,6 +629,15 @@ async function createBatch(
   if (!model.durations.includes(input.settings.durationSeconds)) {
     throw new VideoApiError({
       message: "Esa duración no está disponible para el modelo elegido.",
+      status: 400,
+      code: "VALIDATION_ERROR",
+    });
+  }
+
+  const maxPrompt = model.id.startsWith("Hailuo") ? 2000 : 2500;
+  if (input.prompt.length > maxPrompt) {
+    throw new VideoApiError({
+      message: `El prompt supera el máximo de ${maxPrompt} caracteres para ${model.id}.`,
       status: 400,
       code: "VALIDATION_ERROR",
     });

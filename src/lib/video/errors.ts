@@ -92,6 +92,9 @@ export function videoErrorMessage(
   code: string | null | undefined,
   fallback?: string | null,
 ): string {
+  if (code === "VALIDATION_ERROR" && fallback) {
+    return `Los datos de la generación no son válidos: ${fallback}`;
+  }
   if (code && ERROR_MESSAGES[code]) return ERROR_MESSAGES[code];
   if (fallback) return fallback;
   return "No se pudo completar la operación con el proveedor de video.";

@@ -234,6 +234,7 @@ export async function prepareVideoUploads(
 
     return { ok: true, items };
   } catch (error) {
+    console.error("[video-upload-init]", parsed.data.provider, error);
     return { error: errorMessage(error) };
   }
 }
@@ -312,6 +313,7 @@ export async function quoteVideo(
 
     return { ok: true, quote };
   } catch (error) {
+    console.error("[video-quote]", parsed.data.provider, error);
     return { error: errorMessage(error) };
   }
 }
@@ -428,6 +430,15 @@ export async function createVideoBatch(
     };
   } catch (error) {
     if (error instanceof VideoApiError) {
+      console.error(
+        "[video-create]",
+        data.provider,
+        error.status,
+        error.code,
+        error.message,
+        JSON.stringify(error.body ?? null).slice(0, 1000),
+      );
+
       if (error.code === "PRICE_CHANGED" && error.quote) {
         return {
           error: videoErrorMessage("PRICE_CHANGED"),
